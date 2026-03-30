@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { BrandLogo, ThemeToggle, useThemeState } from '../components/chrome';
+import { InstallAppButton } from '../components/pwa-provider';
 
 const TRAINERS = [
   { name: 'Arjun Mehta', role: 'Strength Coach', tags: ['Strength', 'Technique', 'Progression'], years: '8+ yrs' },
@@ -54,6 +55,7 @@ export default function PowerHouseLandingPage() {
           </nav>
 
           <div className="landing-actions">
+            <InstallAppButton className="ghost-button" label="Install App" />
             <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
             <Link className="ghost-button" href="/login">Login</Link>
             <Link className="landing-primary" href="/signup/client">Join Now</Link>
@@ -69,6 +71,7 @@ export default function PowerHouseLandingPage() {
             Join a premium training environment where your workouts stay structured, your progress stays visible, and your consistency becomes unstoppable.
           </p>
           <div className="landing-cta">
+            <InstallAppButton className="landing-secondary" label="Install App" />
             <Link className="landing-primary" href="/signup/client">Start as a Member</Link>
             <Link className="landing-secondary" href="/signup/trainer">Apply as Trainer</Link>
             <Link className="landing-secondary" href="/login">Already a member?</Link>

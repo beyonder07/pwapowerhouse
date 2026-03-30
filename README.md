@@ -21,6 +21,7 @@ Cloud-first Gym Management System built as a single Next.js fullstack app with S
 ## Current Capabilities
 - Landing page and login flow
 - Client, trainer, and owner dashboards
+- Installable PWA with manifest, service worker, offline fallback, and update prompt
 - Request-based onboarding for clients and trainers
 - Owner direct member creation
 - Forgot password with OTP scaffolding
@@ -66,6 +67,8 @@ OWNER_BOOTSTRAP_TOKEN=one-time-setup-code
 OTP_DELIVERY_PROVIDER=dev-log
 OTP_WEBHOOK_URL=
 OTP_WEBHOOK_AUTH_HEADER=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=PowerHouse Gym <onboarding@resend.dev>
 ```
 
 Notes:
@@ -73,6 +76,7 @@ Notes:
 - `OWNER_BOOTSTRAP_TOKEN` protects the first-owner setup route in production.
 - `OTP_DELIVERY_PROVIDER=dev-log` is safe for local development only.
 - For production OTP delivery, use `OTP_DELIVERY_PROVIDER=webhook` and point `OTP_WEBHOOK_URL` at your SMS/email service bridge.
+- For Resend email delivery, use `OTP_DELIVERY_PROVIDER=resend` with `RESEND_API_KEY`.
 
 ## Supabase Setup
 Apply these files in order inside the Supabase SQL editor:
@@ -162,6 +166,13 @@ Current behavior:
 - supports public signup uploads and authenticated profile/member uploads
 - removes replaced profile photos after successful profile/member/trainer updates
 
+## PWA Behavior
+- install prompt is available on supported browsers
+- service worker caches the app shell and visited screens
+- offline fallback page is available at `/offline`
+- cached pages still open offline after first visit
+- update banner appears when a new version is ready
+
 ## Security Model
 - Only one owner is allowed by a partial unique index.
 - Non-owner writes are intended to go through Next.js API routes using the service role key.
@@ -179,6 +190,11 @@ Supported providers:
 - `webhook`
   - POSTs `{ role, channel, destination, code }` to `OTP_WEBHOOK_URL`
   - optional auth header via `OTP_WEBHOOK_AUTH_HEADER`
+- `resend`
+  - sends OTP email through Resend
+  - uses `RESEND_API_KEY`
+  - uses `RESEND_FROM_EMAIL`
+  - for phone-based owner OTP, also configure `OTP_WEBHOOK_URL` for SMS delivery
 
 Recommended production shape:
 1. Use SMS for owner resets.

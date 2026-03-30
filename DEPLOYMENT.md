@@ -1,6 +1,7 @@
 # Vercel Deployment Guide
 
 This app is a single Next.js monolith. Frontend pages and backend route handlers deploy together to Vercel.
+It now includes a full PWA layer: manifest, install flow, service worker caching, offline fallback, and update prompts.
 
 ## 1. Before You Deploy
 
@@ -62,12 +63,15 @@ For production:
 OTP_DELIVERY_PROVIDER=webhook
 OTP_WEBHOOK_URL=https://your-otp-bridge.example.com/send
 OTP_WEBHOOK_AUTH_HEADER=Bearer your-secret-token
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=PowerHouse Gym <onboarding@resend.dev>
 ```
 
 Notes:
 - Keep `NEXT_PUBLIC_API_URL` empty unless you intentionally split frontend and API across different domains.
 - `SUPABASE_SERVICE_ROLE_KEY` must stay server-side only. Never expose it in client code.
 - `OWNER_BOOTSTRAP_TOKEN` should be removed or rotated after the first owner is created.
+- If you use `OTP_DELIVERY_PROVIDER=resend`, trainer/client email OTP can go through Resend, but owner phone reset still needs an SMS-capable webhook provider.
 
 ## 4. Supabase Requirements
 
@@ -104,6 +108,11 @@ Recommended:
 After deployment, verify:
 
 - `/api/health`
+- `/manifest.webmanifest`
+- `/sw.js`
+- install prompt appears on supported browsers
+- app can be installed from Chrome / Edge mobile or desktop
+- offline revisit opens cached routes and `/offline`
 - unauthenticated `/owner` redirects to `/login`
 - authenticated owner lands on `/owner`
 - trainer cannot open `/owner`
@@ -126,4 +135,3 @@ After deployment, verify:
 3. Add Vercel monitoring/log drains
 4. Add Supabase backups and alerting
 5. Add Redis-backed rate limiting if you expect multiple Vercel instances
-

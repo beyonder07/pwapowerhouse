@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { BrandLogo, ThemeToggle, useThemeState } from './chrome';
+import { InstallAppButton } from './pwa-provider';
 import { clearSession } from '../lib/auth';
 
 type RoleType = 'client' | 'trainer' | 'owner';
@@ -104,6 +105,7 @@ export function RoleAppShell({ role, children }: { role: RoleType; children: Rea
         </nav>
 
         <div className="sidebar-footer">
+          <InstallAppButton className="ghost-button" label="Install PowerHouse" />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <button type="button" className="ghost-button" onClick={handleLogout}>Logout</button>
         </div>
@@ -120,6 +122,7 @@ export function RoleAppShell({ role, children }: { role: RoleType; children: Rea
           </div>
           <div className="header-actions">
             <div className="header-role-chip">{role.toUpperCase()}</div>
+            <InstallAppButton className="ghost-button" label="Install App" />
           </div>
         </header>
 
@@ -128,6 +131,7 @@ export function RoleAppShell({ role, children }: { role: RoleType; children: Rea
 
       <div className="mobile-footer-shell">
         <div className="mobile-action-row">
+          <InstallAppButton className="ghost-button compact-header-button" compact label="Install" />
           <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
           <button type="button" className="ghost-button compact-header-button" onClick={handleLogout}>Logout</button>
         </div>
