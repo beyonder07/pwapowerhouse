@@ -2243,6 +2243,10 @@ button:disabled {
   align-self: flex-start;
 }
 
+.analytics-compact-card {
+  flex: 0 1 clamp(320px, 44%, 560px);
+}
+
 .analytics-chart-card {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -2263,6 +2267,10 @@ button:disabled {
   align-content: flex-start;
   align-items: stretch;
   justify-content: flex-start;
+}
+
+.analytics-box-grid-compact {
+  gap: 10px;
 }
 
 .analytics-box-grid > .subcopy {
@@ -2286,6 +2294,10 @@ button:disabled {
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-muted) 76%, var(--surface-strong));
   justify-content: flex-start;
+}
+
+.analytics-box-grid-compact .analytics-box {
+  flex: 0 1 clamp(136px, 17vw, 190px);
 }
 
 .analytics-box strong {
@@ -2431,6 +2443,10 @@ button:disabled {
   flex-basis: clamp(150px, 20vw, 200px);
   max-width: min(100%, 250px);
   min-height: 112px;
+}
+
+.analytics-box-grid-compact .payment-mode-box {
+  flex-basis: clamp(140px, 17vw, 185px);
 }
 
 .timeline-item .ghost-button {

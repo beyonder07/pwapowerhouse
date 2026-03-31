@@ -334,8 +334,8 @@ export default function OwnerAnalyticsPage() {
       </section>
 
       <section className="analytics-row">
-        <SurfaceCard eyebrow="Growth" title="Member join trend" className="analytics-card analytics-list-card">
-          <div className="analytics-box-grid">
+        <SurfaceCard eyebrow="Growth" title="Member join trend" className="analytics-card analytics-list-card analytics-compact-card">
+          <div className="analytics-box-grid analytics-box-grid-compact">
             {memberGrowthBoxes.map((item) => (
               <article key={item.label} className={`analytics-box ${item.accent}`}>
                 <strong>{item.label}</strong>
@@ -346,8 +346,8 @@ export default function OwnerAnalyticsPage() {
           </div>
         </SurfaceCard>
 
-        <SurfaceCard eyebrow="Modes" title="Payment mode split" className="analytics-card analytics-list-card">
-          <div className="analytics-box-grid payment-mode-box-grid">
+        <SurfaceCard eyebrow="Modes" title="Payment mode split" className="analytics-card analytics-list-card analytics-compact-card">
+          <div className="analytics-box-grid analytics-box-grid-compact payment-mode-box-grid">
             {paymentModeBoxes.map((item) => (
               <article key={item.label} className="analytics-box payment-mode-box">
                 <span className="payment-mode-dot" style={{ backgroundColor: item.color }} aria-hidden="true" />
@@ -364,8 +364,8 @@ export default function OwnerAnalyticsPage() {
       </section>
 
       <section className="analytics-row">
-        <SurfaceCard eyebrow="Trainer performance" title="Revenue by trainer" className="analytics-card analytics-list-card">
-          <div className="analytics-box-grid">
+        <SurfaceCard eyebrow="Trainer performance" title="Revenue by trainer" className="analytics-card analytics-list-card analytics-compact-card">
+          <div className="analytics-box-grid analytics-box-grid-compact">
             {trainerPerformanceBoxes.map((item) => (
               <article key={item.id} className={`analytics-box ${item.accent}`}>
                 <strong>{item.label}</strong>
