@@ -167,6 +167,40 @@ export default function OwnerAnalyticsPage() {
   }, [data]);
 
   const attendanceWindow = useMemo(() => (data?.attendanceTrend || []).slice(-12), [data]);
+  const activeBranchLabel = useMemo(
+    () => data?.branches.find((branch) => branch.id === selectedBranch)?.label || 'All branches',
+    [data, selectedBranch]
+  );
+  const strongestRevenueMonth = useMemo(() => {
+    const trend = data?.revenueTrend || [];
+    if (!trend.length) {
+      return null;
+    }
+
+    return trend.reduce((best, current) => (current.value > best.value ? current : best), trend[0]);
+  }, [data]);
+  const newestGrowthPoint = useMemo(() => {
+    const trend = data?.memberTrend || [];
+    return trend[trend.length - 1] || null;
+  }, [data]);
+  const attendanceSummary = useMemo(() => {
+    const window = attendanceWindow;
+    if (!window.length) {
+      return { averagePresent: 0, bestDay: null as null | { label: string; present: number; absent: number } };
+    }
+
+    const averagePresent = Math.round(window.reduce((sum, item) => sum + Number(item.present || 0), 0) / window.length);
+    const bestDay = window.reduce((best, current) => (current.present > best.present ? current : best), window[0]);
+    return { averagePresent, bestDay };
+  }, [attendanceWindow]);
+  const collectionGap = Math.max(0, Number(data?.analytics?.expectedMonthlyMin || 0) - Number(data?.analytics?.revenueMonth || 0));
+  const strongestMode = paymentModeBoxes.reduce<(typeof paymentModeBoxes)[number] | null>((best, current) => {
+    if (!best) {
+      return current;
+    }
+
+    return current.value > best.value ? current : best;
+  }, null);
 
   if (loading || !data) {
     return <LoadingState title="Loading analytics" text="Building revenue, attendance, and branch trends for the owner dashboard." />;
@@ -202,6 +236,48 @@ export default function OwnerAnalyticsPage() {
         { label: 'Expected Monthly Collection', value: data.analytics ? formatExpectedMonthlyCollection(data.analytics.activeMembers) : formatExpectedMonthlyCollection(0) }
       ]} />
 
+      <section className="content-grid two-col owner-pulse-grid analytics-highlight-grid">
+        <SurfaceCard eyebrow="Branch snapshot" title={activeBranchLabel}>
+          <div className="owner-focus-grid">
+            <article className="owner-focus-panel">
+              <span>Revenue month</span>
+              <strong>{currency(data.analytics?.revenueMonth || 0)}</strong>
+              <p className="subcopy">Current approved collection in this branch view.</p>
+            </article>
+            <article className="owner-focus-panel">
+              <span>Best month in trend</span>
+              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} · ${currency(strongestRevenueMonth.value)}` : 'No revenue yet'}</strong>
+              <p className="subcopy">Highest collection point inside the visible monthly trend.</p>
+            </article>
+            <article className="owner-focus-panel">
+              <span>Collection gap</span>
+              <strong>{collectionGap > 0 ? currency(collectionGap) : 'On target'}</strong>
+              <p className="subcopy">Shortfall against the minimum monthly collection expectation.</p>
+            </article>
+          </div>
+        </SurfaceCard>
+
+        <SurfaceCard eyebrow="Owner focus" title="What to watch next">
+          <div className="owner-focus-grid">
+            <article className="owner-focus-panel">
+              <span>Average attendance</span>
+              <strong>{attendanceSummary.averagePresent} visits / day</strong>
+              <p className="subcopy">Average present marks across the latest attendance window.</p>
+            </article>
+            <article className="owner-focus-panel">
+              <span>Top payment mode</span>
+              <strong>{strongestMode ? `${strongestMode.label} · ${strongestMode.share}%` : 'No payment mode yet'}</strong>
+              <p className="subcopy">Current dominant mode of collection this month.</p>
+            </article>
+            <article className="owner-focus-panel">
+              <span>Newest joins</span>
+              <strong>{newestGrowthPoint ? `${newestGrowthPoint.value} in ${newestGrowthPoint.label}` : 'No join trend yet'}</strong>
+              <p className="subcopy">Most recent monthly member growth point in view.</p>
+            </article>
+          </div>
+        </SurfaceCard>
+      </section>
+
       <section className="analytics-row">
         <SurfaceCard eyebrow="Revenue" title="Monthly collection trend" className="analytics-card analytics-list-card">
           <ResponsiveLineChart
@@ -215,6 +291,16 @@ export default function OwnerAnalyticsPage() {
             ]}
             valueFormatter={(value) => currency(value)}
           />
+          <div className="owner-focus-strip analytics-chart-meta">
+            <div className="owner-focus-box">
+              <span>Current month</span>
+              <strong>{currency(data.analytics?.revenueMonth || 0)}</strong>
+            </div>
+            <div className="owner-focus-box">
+              <span>Best month</span>
+              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} · ${currency(strongestRevenueMonth.value)}` : 'No data yet'}</strong>
+            </div>
+          </div>
         </SurfaceCard>
 
         <SurfaceCard eyebrow="Attendance" title="Last 30 days" className="analytics-card analytics-list-card">
@@ -234,6 +320,16 @@ export default function OwnerAnalyticsPage() {
             ]}
             valueFormatter={(value) => `${value}`}
           />
+          <div className="owner-focus-strip analytics-chart-meta">
+            <div className="owner-focus-box">
+              <span>Average present</span>
+              <strong>{attendanceSummary.averagePresent} / day</strong>
+            </div>
+            <div className="owner-focus-box">
+              <span>Best day</span>
+              <strong>{attendanceSummary.bestDay ? `${attendanceSummary.bestDay.label} · ${attendanceSummary.bestDay.present} present` : 'No data yet'}</strong>
+            </div>
+          </div>
         </SurfaceCard>
       </section>
 

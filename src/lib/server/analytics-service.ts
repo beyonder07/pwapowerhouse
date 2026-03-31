@@ -260,6 +260,13 @@ export async function getOwnerOverviewSnapshot() {
   return {
     analytics: analytics.analytics,
     branches: analytics.branches,
+    revenueTrend: analytics.revenueTrend,
+    attendancePulse: analytics.attendanceTrend.slice(-10).map((item) => ({
+      label: item.label,
+      present: item.present,
+      total: item.present + item.absent
+    })),
+    paymentModeSplit: analytics.paymentModeSplit.filter((item) => Number(item.value || 0) > 0),
     sync: {
       generatedAt: new Date().toISOString(),
       pendingRequests: requestsRes.data?.length || 0
