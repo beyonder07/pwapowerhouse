@@ -63,15 +63,12 @@ For production:
 OTP_DELIVERY_PROVIDER=webhook
 OTP_WEBHOOK_URL=https://your-otp-bridge.example.com/send
 OTP_WEBHOOK_AUTH_HEADER=Bearer your-secret-token
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=PowerHouse Gym <onboarding@resend.dev>
 ```
 
 Notes:
 - Keep `NEXT_PUBLIC_API_URL` empty unless you intentionally split frontend and API across different domains.
 - `SUPABASE_SERVICE_ROLE_KEY` must stay server-side only. Never expose it in client code.
 - `OWNER_BOOTSTRAP_TOKEN` should be removed or rotated after the first owner is created.
-- If you use `OTP_DELIVERY_PROVIDER=resend`, trainer/client email OTP can go through Resend, but owner phone reset still needs an SMS-capable webhook provider.
 
 ## 4. Supabase Requirements
 

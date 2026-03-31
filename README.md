@@ -67,8 +67,6 @@ OWNER_BOOTSTRAP_TOKEN=one-time-setup-code
 OTP_DELIVERY_PROVIDER=dev-log
 OTP_WEBHOOK_URL=
 OTP_WEBHOOK_AUTH_HEADER=
-RESEND_API_KEY=
-RESEND_FROM_EMAIL=PowerHouse Gym <onboarding@resend.dev>
 ```
 
 Notes:
@@ -76,7 +74,6 @@ Notes:
 - `OWNER_BOOTSTRAP_TOKEN` protects the first-owner setup route in production.
 - `OTP_DELIVERY_PROVIDER=dev-log` is safe for local development only.
 - For production OTP delivery, use `OTP_DELIVERY_PROVIDER=webhook` and point `OTP_WEBHOOK_URL` at your SMS/email service bridge.
-- For Resend email delivery, use `OTP_DELIVERY_PROVIDER=resend` with `RESEND_API_KEY`.
 
 ## Supabase Setup
 Apply these files in order inside the Supabase SQL editor:
@@ -190,11 +187,6 @@ Supported providers:
 - `webhook`
   - POSTs `{ role, channel, destination, code }` to `OTP_WEBHOOK_URL`
   - optional auth header via `OTP_WEBHOOK_AUTH_HEADER`
-- `resend`
-  - sends OTP email through Resend
-  - uses `RESEND_API_KEY`
-  - uses `RESEND_FROM_EMAIL`
-  - for phone-based owner OTP, also configure `OTP_WEBHOOK_URL` for SMS delivery
 
 Recommended production shape:
 1. Use SMS for owner resets.
