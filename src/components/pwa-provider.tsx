@@ -7,21 +7,31 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
 
+type InstallGuide = {
+  title: string;
+  steps: string[];
+  note: string;
+};
+
 type PwaContextValue = {
   canInstall: boolean;
+  showInstallAction: boolean;
   isInstalled: boolean;
   isOffline: boolean;
   updateAvailable: boolean;
   installApp: () => Promise<void>;
+  closeInstallHelp: () => void;
   refreshApp: () => void;
 };
 
 const PwaContext = createContext<PwaContextValue>({
   canInstall: false,
+  showInstallAction: false,
   isInstalled: false,
   isOffline: false,
   updateAvailable: false,
   installApp: async () => {},
+  closeInstallHelp: () => {},
   refreshApp: () => {}
 });
 
@@ -31,6 +41,81 @@ function isStandaloneDisplay() {
   }
 
   return window.matchMedia('(display-mode: standalone)').matches || (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+}
+
+function getInstallGuide() : InstallGuide {
+  if (typeof navigator === 'undefined') {
+    return {
+      title: 'Install PowerHouse',
+      steps: ['Open this app in a supported browser to install it.'],
+      note: 'Chrome, Edge, and Safari support installation in different ways.'
+    };
+  }
+
+  const userAgent = navigator.userAgent.toLowerCase();
+  const isIos = /iphone|ipad|ipod/.test(userAgent);
+  const isAndroid = /android/.test(userAgent);
+  const isSafari = /safari/.test(userAgent) && !/chrome|crios|edg|opr|fxios/.test(userAgent);
+  const isChromium = /chrome|crios|edg|opr/.test(userAgent);
+
+  if (isIos) {
+    return {
+      title: 'Install on iPhone or iPad',
+      steps: [
+        'Open this app in Safari.',
+        'Tap the Share button in the browser toolbar.',
+        'Choose "Add to Home Screen".',
+        'Tap "Add" to place PowerHouse on your home screen.'
+      ],
+      note: 'iPhone and iPad use the Share menu instead of a browser install prompt.'
+    };
+  }
+
+  if (isAndroid && isChromium) {
+    return {
+      title: 'Install on Android',
+      steps: [
+        'Tap the browser menu in Chrome or Edge.',
+        'Choose "Install app" or "Add to Home screen".',
+        'Confirm the install when Android asks.'
+      ],
+      note: 'If the browser prompt appears automatically, you can use that instead.'
+    };
+  }
+
+  if (isChromium) {
+    return {
+      title: 'Install on desktop',
+      steps: [
+        'Look for the install icon in the address bar.',
+        'If you do not see it, open the browser menu.',
+        'Choose "Install PowerHouse Gym" or "Install app".'
+      ],
+      note: 'Chrome and Edge usually show an install icon once the app is ready.'
+    };
+  }
+
+  if (isSafari) {
+    return {
+      title: 'Install from Safari',
+      steps: [
+        'Open the Safari File or Share menu.',
+        'Choose "Add to Dock" or "Add to Home Screen" if Safari offers it.',
+        'If the option is missing, use Chrome or Edge for the easiest install flow.'
+      ],
+      note: 'Safari install options vary by device and version.'
+    };
+  }
+
+  return {
+    title: 'Install PowerHouse',
+    steps: [
+      'Open the browser menu.',
+      'Look for "Install app", "Add to Home screen", or a similar option.',
+      'If your browser does not offer installation, try Chrome, Edge, or Safari.'
+    ],
+    note: 'Install support depends on the browser and device.'
+  };
 }
 
 function PwaStatusBanner({
@@ -67,14 +152,46 @@ function PwaStatusBanner({
   );
 }
 
+function PwaInstallHelp({
+  open,
+  guide,
+  onClose
+}: {
+  open: boolean;
+  guide: InstallGuide;
+  onClose: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="install-help-title">
+        <button type="button" className="ghost-button compact-dismiss" onClick={onClose}>Close</button>
+        <p className="eyebrow">Install PowerHouse</p>
+        <h2 id="install-help-title">{guide.title}</h2>
+        <p className="subcopy">{guide.note}</p>
+        <ol className="install-help-list">
+          {guide.steps.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 export function PwaProvider({ children }: { children: ReactNode }) {
   const [isOffline, setIsOffline] = useState(false);
   const [canInstall, setCanInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(() => isStandaloneDisplay());
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
   const probeRef = useRef<AbortController | null>(null);
+  const installGuide = useMemo(() => getInstallGuide(), []);
 
   const checkConnectivity = useCallback(async () => {
     if (typeof window === 'undefined') {
@@ -120,6 +237,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       deferredPromptRef.current = null;
       setCanInstall(false);
       setIsInstalled(true);
+      setShowInstallHelp(false);
     };
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -199,20 +317,23 @@ export function PwaProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<PwaContextValue>(() => ({
     canInstall: canInstall && !isInstalled,
+    showInstallAction: !isInstalled,
     isInstalled,
     isOffline,
     updateAvailable,
     installApp: async () => {
-      if (!deferredPromptRef.current) {
-        return;
+      if (deferredPromptRef.current) {
+        await deferredPromptRef.current.prompt();
+        const choice = await deferredPromptRef.current.userChoice;
+        if (choice.outcome === 'accepted') {
+          setCanInstall(false);
+          return;
+        }
       }
 
-      await deferredPromptRef.current.prompt();
-      const choice = await deferredPromptRef.current.userChoice;
-      if (choice.outcome === 'accepted') {
-        setCanInstall(false);
-      }
+      setShowInstallHelp(true);
     },
+    closeInstallHelp: () => setShowInstallHelp(false),
     refreshApp: () => {
       const waiting = registrationRef.current?.waiting;
       if (waiting) {
@@ -227,6 +348,7 @@ export function PwaProvider({ children }: { children: ReactNode }) {
   return (
     <PwaContext.Provider value={value}>
       {children}
+      <PwaInstallHelp open={showInstallHelp && !isInstalled} guide={installGuide} onClose={value.closeInstallHelp} />
       <PwaStatusBanner isOffline={isOffline} updateAvailable={updateAvailable} onRefresh={value.refreshApp} />
     </PwaContext.Provider>
   );
@@ -245,9 +367,9 @@ export function InstallAppButton({
   className?: string;
   label?: string;
 }) {
-  const { canInstall, installApp } = usePwa();
+  const { showInstallAction, installApp } = usePwa();
 
-  if (!canInstall) {
+  if (!showInstallAction) {
     return null;
   }
 
