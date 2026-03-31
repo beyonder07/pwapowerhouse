@@ -105,6 +105,7 @@ export function BrandLogo() {
       alt="PowerHouse Gym logo"
       width={72}
       height={72}
+      sizes="(max-width: 520px) 44px, (max-width: 960px) 56px, 72px"
       onError={() => setFailed(true)}
       unoptimized
     />

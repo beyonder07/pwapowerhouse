@@ -56,6 +56,7 @@ body {
   font-family: var(--font-body);
   color: var(--text);
   overflow-x: hidden;
+  min-width: 320px;
   background:
     radial-gradient(circle at top left, rgba(220, 38, 38, 0.16), transparent 26%),
     radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 20%),
@@ -720,6 +721,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  flex-wrap: wrap;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 10px 12px;
@@ -779,6 +781,7 @@ button:disabled {
   align-items: center;
   color: var(--text-muted);
   font-weight: 700;
+  min-width: 0;
 }
 
 .landing-links a {
@@ -805,6 +808,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  max-width: 100%;
   min-height: 48px;
   padding: 12px 16px;
   border-radius: 999px;
@@ -896,6 +900,7 @@ button:disabled {
 
 .landing-hero-visual {
   position: relative;
+  min-height: 540px;
   border: 1px solid var(--border);
   border-radius: 28px;
   overflow: hidden;
@@ -1283,19 +1288,19 @@ button:disabled {
 
 .pwa-status-stack {
   position: fixed;
-  left: 20px;
   right: 20px;
   bottom: 20px;
   z-index: 45;
   display: grid;
   gap: 10px;
+  width: min(480px, calc(100vw - 40px));
   pointer-events: none;
 }
 
 .pwa-status-card {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   padding: 14px 16px;
   border-radius: 22px;
@@ -1531,6 +1536,7 @@ button:disabled {
   justify-content: flex-end;
   gap: 10px;
   align-items: center;
+  min-width: 0;
 }
 
 .header-role-chip {
@@ -1642,6 +1648,43 @@ button:disabled {
   .owner-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .landing-nav-inner {
+    border-radius: 28px;
+    padding: 12px;
+  }
+
+  .landing-brand {
+    flex: 1 1 240px;
+  }
+
+  .landing-actions {
+    margin-left: auto;
+  }
+
+  .landing-links {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .landing-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .landing-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-hero-visual {
+    min-height: 420px;
+  }
+
+  .landing-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 960px) {
@@ -1655,6 +1698,10 @@ button:disabled {
 
   .app-header {
     padding: 22px 20px 12px;
+  }
+
+  .header-actions .ghost-button {
+    display: none;
   }
 
   .page-scroll-area {
@@ -1677,10 +1724,6 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .landing-hero {
-    grid-template-columns: 1fr;
-  }
-
   .landing-grid.three,
   .landing-grid.four,
   .landing-bullets {
@@ -1692,7 +1735,8 @@ button:disabled {
   }
 
   .landing-actions {
-    justify-content: flex-end;
+    justify-content: flex-start;
+    width: 100%;
   }
 }
 
@@ -1710,15 +1754,29 @@ button:disabled {
     padding: 10px;
   }
 
+  .landing-brand {
+    width: 100%;
+  }
+
+  .landing-brand-text span {
+    white-space: normal;
+  }
+
   .landing-actions {
     width: 100%;
     justify-content: stretch;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .landing-actions .ghost-button,
   .landing-actions .landing-primary,
   .landing-actions .theme-toggle {
-    flex: 1 1 0;
+    width: 100%;
+  }
+
+  .landing-cta > * {
+    flex: 1 1 100%;
   }
 
   .login-hero,
@@ -1746,6 +1804,19 @@ button:disabled {
     min-height: 54px;
     padding: 10px 4px;
     font-size: 0.88rem;
+  }
+
+  .landing-hero-visual {
+    min-height: auto;
+    padding-top: 16px;
+  }
+
+  .hero-card {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    margin: 16px;
   }
 
   .data-table {
@@ -1789,6 +1860,7 @@ button:disabled {
     left: 8px;
     right: 8px;
     bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    width: auto;
   }
 
   .pwa-status-card {

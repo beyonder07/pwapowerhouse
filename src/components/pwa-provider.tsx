@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -68,16 +68,54 @@ function PwaStatusBanner({
 }
 
 export function PwaProvider({ children }: { children: ReactNode }) {
-  const [isOffline, setIsOffline] = useState(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false));
+  const [isOffline, setIsOffline] = useState(false);
   const [canInstall, setCanInstall] = useState(false);
   const [isInstalled, setIsInstalled] = useState(() => isStandaloneDisplay());
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const probeRef = useRef<AbortController | null>(null);
+
+  const checkConnectivity = useCallback(async () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    probeRef.current?.abort();
+    const controller = new AbortController();
+    probeRef.current = controller;
+
+    if (navigator.onLine) {
+      setIsOffline(false);
+      return;
+    }
+
+    try {
+      const timeout = window.setTimeout(() => controller.abort(), 3500);
+      const response = await fetch(`/api/health?ts=${Date.now()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'cache-control': 'no-store' },
+        signal: controller.signal
+      });
+      window.clearTimeout(timeout);
+      setIsOffline(!response.ok);
+    } catch {
+      setIsOffline(true);
+    }
+  }, []);
 
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const initialProbe = window.setTimeout(() => {
+      void checkConnectivity();
+    }, 0);
+
+    const handleOnline = () => {
+      void checkConnectivity();
+    };
+    const handleOffline = () => {
+      void checkConnectivity();
+    };
     const handleInstalled = () => {
       deferredPromptRef.current = null;
       setCanInstall(false);
@@ -88,19 +126,28 @@ export function PwaProvider({ children }: { children: ReactNode }) {
       deferredPromptRef.current = event as BeforeInstallPromptEvent;
       setCanInstall(true);
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void checkConnectivity();
+      }
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('appinstalled', handleInstalled);
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.clearTimeout(initialProbe);
+      probeRef.current?.abort();
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('appinstalled', handleInstalled);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [checkConnectivity]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
