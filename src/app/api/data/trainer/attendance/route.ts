@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import { getTrainerProfileBundle } from '@/lib/server/data-service';
 import { requireAuthorizedUser } from '@/lib/server/auth-utils';
+import { getGymBranchesConfig } from '@/lib/server/gym-location';
 
 export async function GET(request: Request) {
   if (!isSupabaseConfigured()) {
@@ -13,6 +14,9 @@ export async function GET(request: Request) {
     if (!bundle) {
       return NextResponse.json({ error: 'Trainer profile not found.' }, { status: 404 });
     }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const gymBranches = getGymBranchesConfig();
 
     return NextResponse.json({
       memberAttendance: bundle.memberAttendance.slice(0, 20).map((item) => ({
@@ -27,11 +31,13 @@ export async function GET(request: Request) {
         date: item.date,
         checkInTime: item.check_in_time
       })),
+      gymBranches,
+      hasApprovedTodayAttendance: bundle.trainerAttendance.some((item) => item.date === today),
       hasPendingTodayRequest: bundle.requests.some((item) => {
         const payload = (item.data || {}) as { date?: string };
         return item.type === 'trainer-attendance'
           && item.status === 'pending'
-          && payload.date === new Date().toISOString().slice(0, 10);
+          && payload.date === today;
       })
     });
   } catch (error) {

@@ -96,8 +96,21 @@ export async function refreshSession(refreshToken: string, currentRole?: ViewerR
   }
 }
 
-export async function authedFetch(url: string, accessToken: string, refreshToken: string, currentRole: ViewerRole = '') {
-  const run = (token: string) => fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+export async function authedFetch(
+  url: string,
+  accessToken: string,
+  refreshToken: string,
+  currentRole: ViewerRole = '',
+  init: RequestInit = {}
+) {
+  const run = (token: string) => {
+    const headers = new Headers(init.headers || {});
+    headers.set('Authorization', `Bearer ${token}`);
+    return fetch(url, {
+      ...init,
+      headers
+    });
+  };
 
   const first = await run(accessToken);
   if (first.status !== 401) {

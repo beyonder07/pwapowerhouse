@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { normalizePhone, requestSchema, requireAuthorizedUser } from '@/lib/server/auth-utils';
+import { validateGymProximity } from '@/lib/server/gym-location';
 import { parseListQuery } from '@/lib/server/list-utils';
 import { getOwnerRequestsList } from '@/lib/server/owner-list-service';
 
@@ -27,6 +28,7 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminSupabaseClient();
+  let trainerAttendanceBranch: { id: string; label: string } | null = null;
   if (parsed.data.type === 'client' || parsed.data.type === 'trainer' || parsed.data.type === 'member') {
     const payload = parsed.data.data as Record<string, unknown>;
     const email = String(payload.email || '').trim().toLowerCase();
@@ -49,6 +51,25 @@ export async function POST(request: Request) {
 
   if (parsed.data.type === 'trainer-attendance' && createdBy) {
     const requestDate = String(parsed.data.data.date || new Date().toISOString().slice(0, 10));
+    const proximity = validateGymProximity({
+      latitude: Number(parsed.data.data.latitude || 0),
+      longitude: Number(parsed.data.data.longitude || 0),
+      accuracyMeters: typeof parsed.data.data.accuracyMeters === 'number' ? parsed.data.data.accuracyMeters : undefined
+    });
+
+    if (!proximity.withinRange || !proximity.activeBranch) {
+      return NextResponse.json({
+        error: proximity.message,
+        distanceMeters: proximity.activeBranch ? Math.round(proximity.activeBranch.distanceMeters) : null,
+        distanceLabel: proximity.activeBranch?.distanceLabel || '',
+        radiusMeters: proximity.activeBranch?.branch.radiusMeters || null
+      }, { status: 403 });
+    }
+
+    trainerAttendanceBranch = {
+      id: proximity.activeBranch.branch.id,
+      label: proximity.activeBranch.branch.label
+    };
 
     const [{ data: existingRequests }, { data: trainer }] = await Promise.all([
       admin
@@ -91,7 +112,13 @@ export async function POST(request: Request) {
     .from('requests')
     .insert({
       type: parsed.data.type,
-      data: parsed.data.data,
+      data: parsed.data.type === 'trainer-attendance' && createdBy && trainerAttendanceBranch
+        ? {
+            ...parsed.data.data,
+            branchId: trainerAttendanceBranch.id,
+            branchLabel: trainerAttendanceBranch.label
+          }
+        : parsed.data.data,
       status: 'pending',
       created_by: createdBy
     })

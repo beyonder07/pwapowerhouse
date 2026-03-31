@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { BrandLogo, ThemeToggle, useThemeState } from '../components/chrome';
 import { InstallAppButton } from '../components/pwa-provider';
+import { DEFAULT_GYM_BRANCHES } from '../lib/location';
 
 const TRAINERS = [
   { name: 'Arjun Mehta', role: 'Strength Coach', tags: ['Strength', 'Technique', 'Progression'], years: '8+ yrs' },
@@ -49,6 +50,7 @@ export default function PowerHouseLandingPage() {
 
           <nav className="landing-links" aria-label="Primary">
             <a href="#experience">Experience</a>
+            <a href="#branches">Branches</a>
             <a href="#trainers">Trainers</a>
             <a href="#plans">Plans</a>
             <a href="#testimonials">Results</a>
@@ -79,6 +81,12 @@ export default function PowerHouseLandingPage() {
           <p className="landing-trust">
             No long-term lock-in. Beginner friendly. Coach-led training.
           </p>
+          <div className="landing-location-note">
+            <strong>Two active branches</strong>
+            <span>
+              Attendance and directions now work for both PowerHouse locations, so members and trainers can use the nearest branch.
+            </span>
+          </div>
           <div className="landing-bullets">
             <div className="landing-bullet">
               <strong>Structured programs</strong>
@@ -114,6 +122,40 @@ export default function PowerHouseLandingPage() {
             </div>
           </div>
           <div className="hero-glow" />
+        </div>
+      </section>
+
+      <section id="branches" className="landing-section subtle">
+        <div className="landing-section-head">
+          <p className="eyebrow">Branches</p>
+          <h2>Two PowerHouse branches. One consistent training system.</h2>
+          <p className="subcopy">
+            Choose the branch that is closest to you. The app can open directions for both branches, and location-based attendance works at each one.
+          </p>
+        </div>
+        <div className="landing-grid two">
+          {DEFAULT_GYM_BRANCHES.map((branch) => (
+            <article key={branch.id} className="landing-card branch-highlight-card">
+              <div className="branch-highlight-head">
+                <div>
+                  <strong>{branch.label}</strong>
+                  <p className="subcopy">Live check-in radius: {branch.radiusMeters} meters</p>
+                </div>
+                <span className="tag">Maps ready</span>
+              </div>
+              <p className="subcopy">
+                Open this branch in Google Maps, visit the reception or entrance, and the app will validate attendance when you are within range.
+              </p>
+              <div className="landing-cta branch-cta">
+                <a className="landing-secondary" href={branch.mapsUrl} target="_blank" rel="noreferrer">
+                  Open in Google Maps
+                </a>
+                <Link className="landing-secondary" href="/login">
+                  Existing member login
+                </Link>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 

@@ -51,7 +51,10 @@ export const requestSchema = z.object({
   if (value.type === 'trainer-attendance') {
     const parsed = z.object({
       date: z.string().refine((date) => isStrictIsoDate(date), 'Date must be in YYYY-MM-DD format.')
-        .refine((date) => !isFutureIsoDate(date), 'Future attendance is not allowed.')
+        .refine((date) => !isFutureIsoDate(date), 'Future attendance is not allowed.'),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      accuracyMeters: z.number().min(0).max(5000).optional()
     }).safeParse(data);
 
     if (!parsed.success) {

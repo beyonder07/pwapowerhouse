@@ -67,6 +67,16 @@ OWNER_BOOTSTRAP_TOKEN=one-time-setup-code
 OTP_DELIVERY_PROVIDER=dev-log
 OTP_WEBHOOK_URL=
 OTP_WEBHOOK_AUTH_HEADER=
+NEXT_PUBLIC_GYM_BRANCH_1_LABEL=Power House Gym Indira Chowk Branch
+NEXT_PUBLIC_GYM_BRANCH_1_LATITUDE=28.0320613
+NEXT_PUBLIC_GYM_BRANCH_1_LONGITUDE=79.1316603
+NEXT_PUBLIC_GYM_BRANCH_1_RADIUS_METERS=150
+NEXT_PUBLIC_GYM_BRANCH_1_MAPS_URL=https://www.google.com/maps/place/Power+House+Gym/@28.0320613,79.1316603,17z/data=!3m1!4b1!4m6!3m5!1s0x397545eae4106853:0xd8f6742e12db8be2!8m2!3d28.0320613!4d79.1316603!16s%2Fg%2F11fxzs7lbs
+NEXT_PUBLIC_GYM_BRANCH_2_LABEL=Power House Gym Pathik Chowk Branch (Rajendra Complex)
+NEXT_PUBLIC_GYM_BRANCH_2_LATITUDE=28.0429756
+NEXT_PUBLIC_GYM_BRANCH_2_LONGITUDE=79.1271526
+NEXT_PUBLIC_GYM_BRANCH_2_RADIUS_METERS=150
+NEXT_PUBLIC_GYM_BRANCH_2_MAPS_URL=https://www.google.com/maps/place/Power+House+Gym/data=!4m7!3m6!1s0x397545862e915073:0x7af65aec0e6bc596!8m2!3d28.0429756!4d79.1271526!16s%2Fg%2F11j337_6qn
 ```
 
 Notes:
@@ -74,6 +84,7 @@ Notes:
 - `OWNER_BOOTSTRAP_TOKEN` protects the first-owner setup route in production.
 - `OTP_DELIVERY_PROVIDER=dev-log` is safe for local development only.
 - For production OTP delivery, use `OTP_DELIVERY_PROVIDER=webhook` and point `OTP_WEBHOOK_URL` at your SMS/email service bridge.
+- Two branch defaults are already built into the app. Use the `NEXT_PUBLIC_GYM_BRANCH_*` values only if you want to override the labels, coordinates, radius, or map links.
 
 ## Supabase Setup
 Apply these files in order inside the Supabase SQL editor:
@@ -169,6 +180,8 @@ Current behavior:
 - offline fallback page is available at `/offline`
 - cached pages still open offline after first visit
 - update banner appears when a new version is ready
+- landing page advertises both active branches
+- client and trainer attendance can validate against either configured branch
 
 ## Security Model
 - Only one owner is allowed by a partial unique index.

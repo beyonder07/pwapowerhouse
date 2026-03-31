@@ -118,3 +118,37 @@ export async function authedJson<T>(path: string, session: SessionState) {
 
   return { ok: true, unauthorized: false, data: json as T, error: null, session: result.session };
 }
+
+export async function authedJsonRequest<T>(path: string, session: SessionState, init: RequestInit) {
+  const headers = new Headers(init.headers || {});
+  if (!headers.has('Content-Type') && init.body) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const result = await authedFetch(
+    `${API_URL}${path}`,
+    session.accessToken,
+    session.refreshToken,
+    session.role,
+    {
+      ...init,
+      headers
+    }
+  );
+  if (!result.session) {
+    return { ok: false, unauthorized: true, data: null as T | null, error: 'Session expired', session: null };
+  }
+
+  const json = await result.response.json().catch(() => null);
+  if (!result.response.ok) {
+    return {
+      ok: false,
+      unauthorized: result.response.status === 401,
+      data: null as T | null,
+      error: String((json as { error?: string } | null)?.error || 'Request failed'),
+      session: result.session
+    };
+  }
+
+  return { ok: true, unauthorized: false, data: json as T, error: null, session: result.session };
+}
