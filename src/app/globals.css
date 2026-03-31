@@ -2126,6 +2126,7 @@ button:disabled {
   border-radius: 18px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-muted) 72%, var(--surface-strong));
+  align-content: start;
 }
 
 .owner-focus-box span,
@@ -2158,7 +2159,7 @@ button:disabled {
   gap: 10px;
   flex: 1 1 clamp(240px, 32vw, 340px);
   max-width: min(100%, 420px);
-  min-height: 92px;
+  min-height: 80px;
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid var(--border);
@@ -2213,10 +2214,11 @@ button:disabled {
   border-radius: 18px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-muted) 74%, var(--surface-strong));
+  align-content: start;
 }
 
 .analytics-highlight-grid .owner-focus-grid {
-  height: 100%;
+  height: auto;
 }
 
 .analytics-chart-meta {
@@ -2231,13 +2233,14 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 18px;
-  align-items: stretch;
+  align-items: flex-start;
 }
 
 .analytics-card {
   flex: 1 1 420px;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
+  align-self: flex-start;
 }
 
 .analytics-chart-card {
@@ -2276,12 +2279,13 @@ button:disabled {
   gap: 8px;
   flex: 1 1 clamp(150px, 20vw, 210px);
   max-width: min(100%, 280px);
-  min-height: 132px;
+  min-height: 104px;
   min-width: 0;
   padding: 14px;
   border-radius: 18px;
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--surface-muted) 76%, var(--surface-strong));
+  justify-content: flex-start;
 }
 
 .analytics-box strong {
@@ -2426,7 +2430,7 @@ button:disabled {
 .payment-mode-box {
   flex-basis: clamp(150px, 20vw, 200px);
   max-width: min(100%, 250px);
-  min-height: 136px;
+  min-height: 112px;
 }
 
 .timeline-item .ghost-button {
