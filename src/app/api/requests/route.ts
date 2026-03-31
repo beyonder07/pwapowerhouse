@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isSupabaseConfigured } from '@/lib/env';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 import { normalizePhone, requestSchema, requireAuthorizedUser } from '@/lib/server/auth-utils';
-import { validateGymProximity } from '@/lib/server/gym-location';
+import { resolveGymBranch, validateGymProximity } from '@/lib/server/gym-location';
 import { parseListQuery } from '@/lib/server/list-utils';
 import { getOwnerRequestsList } from '@/lib/server/owner-list-service';
 
@@ -51,25 +51,38 @@ export async function POST(request: Request) {
 
   if (parsed.data.type === 'trainer-attendance' && createdBy) {
     const requestDate = String(parsed.data.data.date || new Date().toISOString().slice(0, 10));
-    const proximity = validateGymProximity({
-      latitude: Number(parsed.data.data.latitude || 0),
-      longitude: Number(parsed.data.data.longitude || 0),
-      accuracyMeters: typeof parsed.data.data.accuracyMeters === 'number' ? parsed.data.data.accuracyMeters : undefined
-    });
-
-    if (!proximity.withinRange || !proximity.activeBranch) {
-      return NextResponse.json({
-        error: proximity.message,
-        distanceMeters: proximity.activeBranch ? Math.round(proximity.activeBranch.distanceMeters) : null,
-        distanceLabel: proximity.activeBranch?.distanceLabel || '',
-        radiusMeters: proximity.activeBranch?.branch.radiusMeters || null
-      }, { status: 403 });
+    const selectedBranchId = String(parsed.data.data.branchId || '').trim();
+    const selectedBranch = selectedBranchId ? resolveGymBranch(selectedBranchId) : null;
+    if (selectedBranchId && !selectedBranch) {
+      return NextResponse.json({ error: 'Please choose a valid gym branch.' }, { status: 400 });
     }
 
-    trainerAttendanceBranch = {
-      id: proximity.activeBranch.branch.id,
-      label: proximity.activeBranch.branch.label
-    };
+    if (selectedBranch) {
+      trainerAttendanceBranch = {
+        id: selectedBranch.id,
+        label: selectedBranch.label
+      };
+    } else {
+      const proximity = validateGymProximity({
+        latitude: Number(parsed.data.data.latitude || 0),
+        longitude: Number(parsed.data.data.longitude || 0),
+        accuracyMeters: typeof parsed.data.data.accuracyMeters === 'number' ? parsed.data.data.accuracyMeters : undefined
+      });
+
+      if (!proximity.withinRange || !proximity.activeBranch) {
+        return NextResponse.json({
+          error: proximity.message,
+          distanceMeters: proximity.activeBranch ? Math.round(proximity.activeBranch.distanceMeters) : null,
+          distanceLabel: proximity.activeBranch?.distanceLabel || '',
+          radiusMeters: proximity.activeBranch?.branch.radiusMeters || null
+        }, { status: 403 });
+      }
+
+      trainerAttendanceBranch = {
+        id: proximity.activeBranch.branch.id,
+        label: proximity.activeBranch.branch.label
+      };
+    }
 
     const [{ data: existingRequests }, { data: trainer }] = await Promise.all([
       admin

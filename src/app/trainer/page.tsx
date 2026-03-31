@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { LoadingState, MetricGrid, Notice, PageIntro, StatusPill, SurfaceCard } from '../../components/app-ui';
 import { useAuthedPageData } from '../../lib/app-client';
 import { currency } from '../../lib/formatters';
 import type { ViewerRole } from '../../lib/auth';
+import { formatMonthlyFeeRangeWithUnit } from '../../lib/fee-config';
 
 const TRAINER_ROLES: ViewerRole[] = ['trainer'];
 
@@ -37,7 +37,8 @@ export default function TrainerOverviewPage() {
           { label: 'Assigned Members', value: String(data.metrics.assignedMembers) },
           { label: 'Pending Requests', value: String(data.metrics.pendingRequests), tone: 'warning' },
           { label: 'Today Check-ins', value: String(data.metrics.todayMemberCheckIns), tone: 'success' },
-          { label: 'This Month Salary', value: currency(data.salarySnapshot.amount) }
+          { label: 'This Month Salary', value: currency(data.salarySnapshot.amount) },
+          { label: 'Member Fee Guide', value: formatMonthlyFeeRangeWithUnit() }
         ]}
       />
 
@@ -60,15 +61,6 @@ export default function TrainerOverviewPage() {
             <div><span>Month</span><strong>{data.salarySnapshot.month}</strong></div>
             <div><span>Amount</span><strong>{currency(data.salarySnapshot.amount)}</strong></div>
             <div><span>Status</span><strong>{data.salarySnapshot.status}</strong></div>
-          </div>
-        </SurfaceCard>
-
-        <SurfaceCard eyebrow="Quick actions" title="Trainer shortcuts">
-          <div className="timeline-list dense">
-            <Link href="/trainer/members" className="text-link">Open assigned members</Link>
-            <Link href="/trainer/workouts" className="text-link">Send workout requests</Link>
-            <Link href="/trainer/attendance" className="text-link">Review attendance</Link>
-            <Link href="/trainer/requests" className="text-link">Track approval requests</Link>
           </div>
         </SurfaceCard>
       </section>

@@ -4,6 +4,7 @@ import { LoadingState, Notice, PageIntro, StatusPill, SurfaceCard } from '../../
 import { useAuthedPageData } from '../../../lib/app-client';
 import { formatDate } from '../../../lib/formatters';
 import type { ViewerRole } from '../../../lib/auth';
+import { formatMonthlyFeeRangeWithUnit } from '../../../lib/fee-config';
 
 const CLIENT_ROLES: ViewerRole[] = ['client'];
 
@@ -30,6 +31,7 @@ export default function ClientMembershipPage() {
               <div><span>Status</span><StatusPill label={data.membership.status} tone={data.membership.status === 'active' ? 'success' : 'warning'} /></div>
               <div><span>Start date</span><strong>{formatDate(data.membership.startDate)}</strong></div>
               <div><span>Expiry date</span><strong>{formatDate(data.membership.expiryDate)}</strong></div>
+              <div><span>Typical fee</span><strong>{formatMonthlyFeeRangeWithUnit()}</strong></div>
               <div className="highlight-detail"><span>Days remaining</span><strong>{data.membership.daysRemaining}</strong></div>
             </div>
             {needsAttention ? (
@@ -38,6 +40,7 @@ export default function ClientMembershipPage() {
                 <p className="subcopy">Your plan is nearing expiry. Please contact the gym desk or owner soon so your access continues without interruption.</p>
               </div>
             ) : null}
+            <p className="subcopy">Most monthly memberships at PowerHouse stay between {formatMonthlyFeeRangeWithUnit()} depending on the level of support and plan guidance you choose.</p>
           </>
         ) : (
           <p className="subcopy">No membership data is synced for this account yet.</p>

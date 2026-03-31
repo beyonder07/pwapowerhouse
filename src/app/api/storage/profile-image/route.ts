@@ -21,6 +21,7 @@ const CATEGORY_RULES: Record<string, { folder: string; roles?: AppRole[] }> = {
   'member-record': { folder: 'records/members', roles: ['owner'] },
   'trainer-record': { folder: 'records/trainers', roles: ['owner'] },
   'trainer-member-request': { folder: 'requests/members', roles: ['trainer'] },
+  'payment-proof-client': { folder: 'payments/proofs', roles: ['client'] },
   'profile-client': { folder: 'profiles/clients', roles: ['client'] },
   'profile-trainer': { folder: 'profiles/trainers', roles: ['trainer'] },
   'profile-owner': { folder: 'profiles/owners', roles: ['owner'] }

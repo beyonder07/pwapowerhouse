@@ -19,7 +19,7 @@ export const DEFAULT_GYM_BRANCHES: GymBranchConfig[] = [
     label: 'Power House Gym Indira Chowk Branch',
     latitude: 28.0320613,
     longitude: 79.1316603,
-    radiusMeters: 150,
+    radiusMeters: 200,
     mapsUrl: 'https://www.google.com/maps/place/Power+House+Gym/@28.0320613,79.1316603,17z/data=!3m1!4b1!4m6!3m5!1s0x397545eae4106853:0xd8f6742e12db8be2!8m2!3d28.0320613!4d79.1316603!16s%2Fg%2F11fxzs7lbs?authuser=0&hl=en&entry=ttu&g_ep=EgoyMDI2MDMyNC4wIKXMDSoASAFQAw%3D%3D'
   },
   {
@@ -27,7 +27,7 @@ export const DEFAULT_GYM_BRANCHES: GymBranchConfig[] = [
     label: 'Power House Gym Pathik Chowk Branch (Rajendra Complex)',
     latitude: 28.0429756,
     longitude: 79.1271526,
-    radiusMeters: 150,
+    radiusMeters: 200,
     mapsUrl: 'https://www.google.com/maps/place/Power+House+Gym/data=!4m7!3m6!1s0x397545862e915073:0x7af65aec0e6bc596!8m2!3d28.0429756!4d79.1271526!16s%2Fg%2F11j337_6qn!19sChIJc1CRLoZFdTkRlsVrDuxa9no?authuser=0&hl=en&rclk=1'
   }
 ];
@@ -138,4 +138,13 @@ export function getNearestGymBranchSummary(
     matched,
     candidates
   };
+}
+
+export function getGymBranchById(branches: GymBranchConfig[], branchId: string) {
+  const normalized = branchId.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  return branches.find((branch) => branch.id === normalized) || null;
 }

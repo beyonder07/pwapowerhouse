@@ -1,4 +1,13 @@
+import { getGymBranchesConfig } from '@/lib/server/gym-location';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
+import { formatMonthlyFeeRange, getExpectedMonthlyCollection } from '@/lib/fee-config';
+
+type AuditRow = {
+  entity_type: string;
+  entity_id: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
 
 function monthKey(value: string | Date) {
   const date = typeof value === 'string' ? new Date(value) : value;
@@ -43,18 +52,36 @@ function dayRange(count: number) {
   });
 }
 
-export async function getOwnerAnalyticsSnapshot() {
+function buildAuditMap(rows: AuditRow[]) {
+  const map = new Map<string, AuditRow>();
+  for (const row of rows) {
+    const key = `${row.entity_type}:${row.entity_id}`;
+    if (map.has(key)) {
+      continue;
+    }
+    map.set(key, row);
+  }
+  return map;
+}
+
+export async function getOwnerAnalyticsSnapshot(branchId = 'all') {
   const admin = createAdminSupabaseClient();
   const today = new Date().toISOString().slice(0, 10);
   const sixMonthStart = new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [paymentsRes, attendanceRes, membersRes, trainersRes, usersRes] = await Promise.all([
+  const [paymentsRes, attendanceRes, membersRes, trainersRes, usersRes, auditsRes] = await Promise.all([
     admin.from('payments').select('id, member_id, amount, mode, status, date').gte('date', sixMonthStart),
     admin.from('attendance').select('id, member_id, date, status').gte('date', thirtyDaysAgo),
     admin.from('members').select('id, user_id, trainer_id, start_date, expiry_date, status'),
     admin.from('trainers').select('id, user_id'),
-    admin.from('users').select('id, name')
+    admin.from('users').select('id, name, phone'),
+    admin
+      .from('activity_audits')
+      .select('entity_type, entity_id, details, created_at')
+      .in('entity_type', ['payment', 'attendance'])
+      .order('created_at', { ascending: false })
+      .limit(3000)
   ]);
 
   const payments = paymentsRes.data || [];
@@ -62,58 +89,91 @@ export async function getOwnerAnalyticsSnapshot() {
   const members = membersRes.data || [];
   const trainers = trainersRes.data || [];
   const users = usersRes.data || [];
+  const audits = (auditsRes.data || []) as AuditRow[];
 
-  const userMap = new Map(users.map((user) => [user.id, user.name]));
+  const userMap = new Map(users.map((user) => [user.id, user]));
+  const auditMap = buildAuditMap(audits);
   const monthBuckets = monthRange(6);
   const dayBuckets = dayRange(30);
   const currentMonthKey = monthKey(new Date());
+  const branchOptions = [
+    { id: 'all', label: 'All branches' },
+    ...getGymBranchesConfig().map((branch) => ({ id: branch.id, label: branch.label }))
+  ];
 
-  const revenueToday = payments
+  const scopedPayments = branchId === 'all'
+    ? payments
+    : payments.filter((item) => {
+        const audit = auditMap.get(`payment:${item.id}`);
+        return audit?.details?.branchId === branchId;
+      });
+
+  const scopedAttendance = branchId === 'all'
+    ? attendance
+    : attendance.filter((item) => {
+        const audit = auditMap.get(`attendance:${item.id}`);
+        return audit?.details?.branchId === branchId;
+      });
+
+  const scopedMemberIds = branchId === 'all'
+    ? new Set(members.map((member) => member.id))
+    : new Set([
+        ...scopedPayments.map((item) => item.member_id),
+        ...scopedAttendance.map((item) => item.member_id)
+      ]);
+
+  const scopedMembers = members.filter((member) => scopedMemberIds.has(member.id));
+  const activeMembersCount = scopedMembers.filter((member) => member.status === 'active').length;
+  const expectedMonthlyCollection = getExpectedMonthlyCollection(activeMembersCount);
+
+  const revenueToday = scopedPayments
     .filter((item) => item.status === 'paid' && item.date === today)
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-  const revenueMonth = payments
+  const revenueMonth = scopedPayments
     .filter((item) => item.status === 'paid' && monthKey(item.date) === currentMonthKey)
     .reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
   const revenueTrend = monthBuckets.map((bucket) => ({
     label: bucket.label,
-    value: payments
+    value: scopedPayments
       .filter((item) => item.status === 'paid' && monthKey(item.date) === bucket.key)
       .reduce((sum, item) => sum + Number(item.amount || 0), 0)
   }));
 
   const memberTrend = monthBuckets.map((bucket) => ({
     label: bucket.label,
-    value: members.filter((item) => monthKey(item.start_date) === bucket.key).length
+    value: scopedMembers.filter((item) => monthKey(item.start_date) === bucket.key).length
   }));
 
   const attendanceTrend = dayBuckets.map((bucket) => ({
     label: bucket.label,
-    present: attendance.filter((item) => item.date === bucket.key && item.status === 'present').length,
-    absent: attendance.filter((item) => item.date === bucket.key && item.status === 'absent').length
+    present: scopedAttendance.filter((item) => item.date === bucket.key && item.status === 'present').length,
+    absent: scopedAttendance.filter((item) => item.date === bucket.key && item.status === 'absent').length
   }));
 
   const paymentModeSplit = ['cash', 'upi', 'card', 'bank-transfer', 'other'].map((mode) => ({
     label: mode,
-    value: payments
+    value: scopedPayments
       .filter((item) => item.status === 'paid' && monthKey(item.date) === currentMonthKey && item.mode === mode)
       .reduce((sum, item) => sum + Number(item.amount || 0), 0)
   }));
 
-  const expiringSoon = members
+  const expiringSoon = scopedMembers
     .filter((member) => member.status === 'active' && member.expiry_date >= today)
-    .sort((left, right) => left.expiry_date.localeCompare(right.expiry_date))
-    .slice(0, 8)
     .map((member) => ({
       id: member.id,
-      name: userMap.get(member.user_id) || 'Member',
+      name: userMap.get(member.user_id)?.name || 'Member',
+      phone: userMap.get(member.user_id)?.phone || '',
       expiryDate: member.expiry_date,
       daysRemaining: Math.max(0, Math.ceil((new Date(member.expiry_date).getTime() - new Date(today).getTime()) / (24 * 60 * 60 * 1000)))
-    }));
+    }))
+    .filter((member) => member.daysRemaining < 2)
+    .sort((left, right) => left.expiryDate.localeCompare(right.expiryDate))
+    .slice(0, 8);
 
-  const membersByTrainer = new Map<number, typeof members>();
-  for (const member of members) {
+  const membersByTrainer = new Map<number, typeof scopedMembers>();
+  for (const member of scopedMembers) {
     if (!member.trainer_id) {
       continue;
     }
@@ -123,15 +183,15 @@ export async function getOwnerAnalyticsSnapshot() {
     membersByTrainer.set(member.trainer_id, existing);
   }
 
-  const attendanceByMember = new Map<number, typeof attendance>();
-  for (const row of attendance) {
+  const attendanceByMember = new Map<number, typeof scopedAttendance>();
+  for (const row of scopedAttendance) {
     const existing = attendanceByMember.get(row.member_id) || [];
     existing.push(row);
     attendanceByMember.set(row.member_id, existing);
   }
 
-  const paymentsByMember = new Map<number, typeof payments>();
-  for (const payment of payments) {
+  const paymentsByMember = new Map<number, typeof scopedPayments>();
+  for (const payment of scopedPayments) {
     const existing = paymentsByMember.get(payment.member_id) || [];
     existing.push(payment);
     paymentsByMember.set(payment.member_id, existing);
@@ -146,21 +206,28 @@ export async function getOwnerAnalyticsSnapshot() {
 
     return {
       id: trainer.id,
-      name: userMap.get(trainer.user_id) || 'Trainer',
+      name: userMap.get(trainer.user_id)?.name || 'Trainer',
       assignedMembers: assignedMembers.length,
       activeMembers: assignedMembers.filter((member) => member.status === 'active').length,
       presentMarks,
       collectedRevenue
     };
-  }).sort((left, right) => right.collectedRevenue - left.collectedRevenue || right.presentMarks - left.presentMarks).slice(0, 6);
+  }).filter((trainer) => trainer.assignedMembers > 0 || branchId === 'all')
+    .sort((left, right) => right.collectedRevenue - left.collectedRevenue || right.presentMarks - left.presentMarks)
+    .slice(0, 6);
 
   return {
+    activeBranchId: branchId,
+    branches: branchOptions,
     analytics: {
       revenueToday,
       revenueMonth,
-      totalMembers: members.length,
-      activeMembers: members.filter((member) => member.status === 'active').length,
-      trainerCount: trainers.length
+      totalMembers: scopedMembers.length,
+      activeMembers: activeMembersCount,
+      trainerCount: trainers.length,
+      feeBandLabel: formatMonthlyFeeRange(),
+      expectedMonthlyMin: expectedMonthlyCollection.min,
+      expectedMonthlyMax: expectedMonthlyCollection.max
     },
     revenueTrend,
     memberTrend,
@@ -173,7 +240,7 @@ export async function getOwnerAnalyticsSnapshot() {
 
 export async function getOwnerOverviewSnapshot() {
   const admin = createAdminSupabaseClient();
-  const analytics = await getOwnerAnalyticsSnapshot();
+  const analytics = await getOwnerAnalyticsSnapshot('all');
 
   const [membersRes, usersRes, paymentsRes, requestsRes] = await Promise.all([
     admin.from('members').select('id, user_id, expiry_date, status').eq('status', 'active').gte('expiry_date', new Date().toISOString().slice(0, 10)).order('expiry_date', { ascending: true }).limit(6),
@@ -192,6 +259,7 @@ export async function getOwnerOverviewSnapshot() {
 
   return {
     analytics: analytics.analytics,
+    branches: analytics.branches,
     sync: {
       generatedAt: new Date().toISOString(),
       pendingRequests: requestsRes.data?.length || 0

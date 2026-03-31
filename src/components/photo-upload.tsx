@@ -16,6 +16,7 @@ type PhotoUploadProps = {
     | 'member-record'
     | 'trainer-record'
     | 'trainer-member-request'
+    | 'payment-proof-client'
     | 'profile-client'
     | 'profile-trainer'
     | 'profile-owner';

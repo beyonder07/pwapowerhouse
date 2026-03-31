@@ -44,6 +44,14 @@ export default function LoginPage() {
     setStatus(null);
 
     try {
+      if (!identifier.trim()) {
+        throw new Error('Please enter your phone number or email.');
+      }
+
+      if (!password.trim()) {
+        throw new Error('Please enter your password.');
+      }
+
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,11 +126,11 @@ export default function LoginPage() {
           <form className="stack-form" onSubmit={handleLogin}>
             <label>
               Phone Number or Email
-              <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Owner uses phone number" />
+              <input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Owner uses phone number" required />
             </label>
             <label>
               Password
-              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="password123" />
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required />
             </label>
             <button type="submit" disabled={loading}>{loading ? 'Signing In...' : 'Enter Dashboard'}</button>
           </form>

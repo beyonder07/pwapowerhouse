@@ -1,6 +1,6 @@
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 
-export async function writeOwnerAudit(action: string, options?: {
+export async function writeActivityAudit(action: string, options?: {
   actorUserId?: string;
   entityType?: string;
   entityId?: string | number;
@@ -22,4 +22,13 @@ export async function writeOwnerAudit(action: string, options?: {
   await admin.from('attendance_audits').insert({
     action
   });
+}
+
+export async function writeOwnerAudit(action: string, options?: {
+  actorUserId?: string;
+  entityType?: string;
+  entityId?: string | number;
+  details?: Record<string, unknown>;
+}) {
+  await writeActivityAudit(action, options);
 }

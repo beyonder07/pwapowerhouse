@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { API_URL, authedFetch, clearSession, getStoredSession, routeForRole, type ViewerRole } from './auth';
 
@@ -13,8 +13,9 @@ export type SessionState = {
 export function useRoleSession(allowedRoles: ViewerRole[]) {
   const router = useRouter();
   const [session, setSession] = useState<SessionState>(() => getStoredSession());
-  const allowedRolesKey = useMemo(() => allowedRoles.join('|'), [allowedRoles]);
-  const ready = Boolean(session.accessToken && allowedRoles.includes(session.role));
+  const allowedRolesKey = allowedRoles.join('|');
+  const allowedRoleSet = useMemo(() => new Set(allowedRolesKey.split('|').filter(Boolean) as ViewerRole[]), [allowedRolesKey]);
+  const ready = Boolean(session.accessToken && allowedRoleSet.has(session.role));
 
   useEffect(() => {
     if (!session.accessToken) {
@@ -23,11 +24,11 @@ export function useRoleSession(allowedRoles: ViewerRole[]) {
       return;
     }
 
-    if (!allowedRoles.includes(session.role)) {
+    if (!allowedRoleSet.has(session.role)) {
       router.replace(session.role ? routeForRole(session.role) : '/login');
       return;
     }
-  }, [allowedRoles, allowedRolesKey, router, session.accessToken, session.role]);
+  }, [allowedRoleSet, router, session.accessToken, session.role]);
 
   const logout = useCallback(() => {
     void fetch(`${API_URL}/api/auth/logout`, { method: 'POST' }).catch(() => null);
@@ -43,35 +44,69 @@ export function useAuthedPageData<T>(endpoint: string, allowedRoles: ViewerRole[
   const { session, setSession, ready, logout } = useRoleSession(allowedRoles);
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasLoadedRef = useRef(false);
+  const requestIdRef = useRef(0);
+
+  const syncSession = useCallback((nextSession: SessionState) => {
+    setSession((current) => {
+      if (
+        current.accessToken === nextSession.accessToken &&
+        current.refreshToken === nextSession.refreshToken &&
+        current.role === nextSession.role
+      ) {
+        return current;
+      }
+
+      return nextSession;
+    });
+  }, [setSession]);
 
   const reload = useCallback(async () => {
     if (!ready || !session.accessToken) {
       return;
     }
 
-    setLoading(true);
+    const requestId = ++requestIdRef.current;
+    const isInitialLoad = !hasLoadedRef.current;
+
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
     setError(null);
 
-    const result = await authedFetch(`${API_URL}${endpoint}`, session.accessToken, session.refreshToken, session.role);
-    if (!result.session) {
-      clearSession();
-      router.replace('/login');
-      return;
-    }
+    try {
+      const result = await authedFetch(`${API_URL}${endpoint}`, session.accessToken, session.refreshToken, session.role);
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
-    setSession(result.session);
-    if (!result.response.ok) {
-      const json = await result.response.json().catch(() => ({ error: 'Failed to load page data' }));
-      setError(String(json.error || 'Failed to load page data'));
-      setLoading(false);
-      return;
-    }
+      if (!result.session) {
+        clearSession();
+        router.replace('/login');
+        return;
+      }
 
-    const json = await result.response.json();
-    setData(json as T);
-    setLoading(false);
-  }, [endpoint, ready, router, session.accessToken, session.refreshToken, session.role, setSession]);
+      syncSession(result.session);
+      if (!result.response.ok) {
+        const json = await result.response.json().catch(() => ({ error: 'Failed to load page data' }));
+        setError(String(json.error || 'Failed to load page data'));
+        return;
+      }
+
+      const json = await result.response.json();
+      hasLoadedRef.current = true;
+      setData(json as T);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [endpoint, ready, router, session.accessToken, session.refreshToken, session.role, syncSession]);
 
   useEffect(() => {
     if (!ready) {
@@ -93,6 +128,7 @@ export function useAuthedPageData<T>(endpoint: string, allowedRoles: ViewerRole[
     data,
     setData,
     loading,
+    refreshing,
     error,
     setError,
     reload

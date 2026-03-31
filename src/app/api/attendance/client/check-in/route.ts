@@ -2,13 +2,21 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { isSupabaseConfigured } from '@/lib/env';
 import { requireAuthorizedUser } from '@/lib/server/auth-utils';
-import { validateGymProximity } from '@/lib/server/gym-location';
+import { resolveGymBranch, validateGymProximity } from '@/lib/server/gym-location';
+import { writeActivityAudit } from '@/lib/server/audit-log';
 import { createAdminSupabaseClient } from '@/lib/supabase/admin';
 
 const schema = z.object({
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
+  branchId: z.string().trim().min(1).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
   accuracyMeters: z.number().min(0).max(5000).optional()
+}).superRefine((value, ctx) => {
+  const hasBranch = Boolean(value.branchId);
+  const hasCoordinates = typeof value.latitude === 'number' && typeof value.longitude === 'number';
+  if (!hasBranch && !hasCoordinates) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Choose your gym branch or allow location access.' });
+  }
 });
 
 export async function POST(request: Request) {
@@ -47,13 +55,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Your membership has expired. Please renew before checking in.' }, { status: 409 });
     }
 
-    const proximity = validateGymProximity(parsed.data);
-    if (!proximity.withinRange || !proximity.activeBranch) {
+    const chosenBranch = parsed.data.branchId ? resolveGymBranch(parsed.data.branchId) : null;
+    if (parsed.data.branchId && !chosenBranch) {
+      return NextResponse.json({ error: 'Please choose a valid gym branch.' }, { status: 400 });
+    }
+
+    const branchContext = chosenBranch
+      ? {
+          branch: chosenBranch,
+          distanceMeters: 0,
+          distanceLabel: '0 m'
+        }
+      : (() => {
+          const proximity = validateGymProximity({
+            latitude: Number(parsed.data.latitude || 0),
+            longitude: Number(parsed.data.longitude || 0),
+            accuracyMeters: parsed.data.accuracyMeters
+          });
+
+          if (!proximity.withinRange || !proximity.activeBranch) {
+            return proximity;
+          }
+
+          return proximity.activeBranch;
+        })();
+
+    if (!('branch' in branchContext)) {
       return NextResponse.json({
-        error: proximity.message,
-        distanceMeters: proximity.activeBranch ? Math.round(proximity.activeBranch.distanceMeters) : null,
-        distanceLabel: proximity.activeBranch?.distanceLabel || '',
-        radiusMeters: proximity.activeBranch?.branch.radiusMeters || null
+        error: branchContext.message,
+        distanceMeters: branchContext.activeBranch ? Math.round(branchContext.activeBranch.distanceMeters) : null,
+        distanceLabel: branchContext.activeBranch?.distanceLabel || '',
+        radiusMeters: branchContext.activeBranch?.branch.radiusMeters || null
       }, { status: 403 });
     }
 
@@ -75,9 +107,9 @@ export async function POST(request: Request) {
         message: 'Your attendance for today is already marked.',
         date: today,
         checkInTime: existingAttendance.check_in_time,
-        branchLabel: proximity.activeBranch.branch.label,
-        distanceMeters: Math.round(proximity.activeBranch.distanceMeters),
-        distanceLabel: proximity.activeBranch.distanceLabel
+        branchLabel: branchContext.branch.label,
+        distanceMeters: Math.round(branchContext.distanceMeters),
+        distanceLabel: branchContext.distanceLabel
       });
     }
 
@@ -95,20 +127,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: upsertError?.message || 'Could not mark attendance.' }, { status: 500 });
     }
 
-    const auditInsert = await admin.from('attendance_audits').insert({
-      attendance_id: attendance.id,
-      action: existingAttendance ? 'client_checkin_updated' : 'client_checkin_created'
-    });
-    void auditInsert;
+    try {
+      await writeActivityAudit(existingAttendance ? 'client_checkin_updated' : 'client_checkin_created', {
+        actorUserId: auth.profile.id,
+        entityType: 'attendance',
+        entityId: attendance.id,
+        details: {
+          branchId: branchContext.branch.id,
+          branchLabel: branchContext.branch.label,
+          distanceMeters: Math.round(branchContext.distanceMeters)
+        }
+      });
+    } catch {
+      // Attendance should still succeed even if audit persistence is temporarily unavailable.
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Check-in successful at ${proximity.activeBranch.branch.label}.`,
+      message: `Check-in successful at ${branchContext.branch.label}.`,
       date: attendance.date,
       checkInTime: attendance.check_in_time,
-      branchLabel: proximity.activeBranch.branch.label,
-      distanceMeters: Math.round(proximity.activeBranch.distanceMeters),
-      distanceLabel: proximity.activeBranch.distanceLabel
+      branchLabel: branchContext.branch.label,
+      distanceMeters: Math.round(branchContext.distanceMeters),
+      distanceLabel: branchContext.distanceLabel
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unauthorized' }, { status: 401 });

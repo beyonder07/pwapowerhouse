@@ -1,8 +1,13 @@
 import { getOptionalEnv } from '@/lib/env';
-import { DEFAULT_GYM_BRANCHES, formatDistanceLabel, getDistanceInMeters, type GymBranchConfig } from '@/lib/location';
+import { DEFAULT_GYM_BRANCHES, formatDistanceLabel, getDistanceInMeters, getGymBranchById, type GymBranchConfig } from '@/lib/location';
 
 function parseNumber(value: string, fallback: number) {
-  const numeric = Number(value);
+  const normalized = value.trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  const numeric = Number(normalized);
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
@@ -20,6 +25,10 @@ function getBranchOverride(index: number, branch: GymBranchConfig): GymBranchCon
 
 export function getGymBranchesConfig(): GymBranchConfig[] {
   return DEFAULT_GYM_BRANCHES.map((branch, index) => getBranchOverride(index, branch));
+}
+
+export function resolveGymBranch(branchId: string) {
+  return getGymBranchById(getGymBranchesConfig(), branchId);
 }
 
 export type GymLocationValidationInput = {

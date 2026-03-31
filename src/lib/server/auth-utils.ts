@@ -6,8 +6,8 @@ import { requireEnv } from '@/lib/env';
 import { ACCESS_TOKEN_COOKIE } from '@/lib/session';
 
 export const loginSchema = z.object({
-  identifier: z.string().min(3),
-  password: z.string().min(6)
+  identifier: z.string().trim().min(3, 'Please enter your phone number or email.'),
+  password: z.string().min(6, 'Please enter your password.')
 });
 
 export const requestSchema = z.object({
@@ -52,13 +52,21 @@ export const requestSchema = z.object({
     const parsed = z.object({
       date: z.string().refine((date) => isStrictIsoDate(date), 'Date must be in YYYY-MM-DD format.')
         .refine((date) => !isFutureIsoDate(date), 'Future attendance is not allowed.'),
-      latitude: z.number().min(-90).max(90),
-      longitude: z.number().min(-180).max(180),
+      branchId: z.string().trim().min(1, 'Please choose a gym branch.').optional(),
+      latitude: z.number().min(-90).max(90).optional(),
+      longitude: z.number().min(-180).max(180).optional(),
       accuracyMeters: z.number().min(0).max(5000).optional()
     }).safeParse(data);
 
     if (!parsed.success) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: parsed.error.issues[0]?.message || 'Invalid trainer attendance request.' });
+      return;
+    }
+
+    const hasBranchId = Boolean(parsed.data.branchId);
+    const hasCoordinates = typeof parsed.data.latitude === 'number' && typeof parsed.data.longitude === 'number';
+    if (!hasBranchId && !hasCoordinates) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Choose a branch or allow location access before continuing.' });
     }
   }
 });

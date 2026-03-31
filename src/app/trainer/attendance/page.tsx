@@ -30,7 +30,7 @@ type RequestResponse = {
   createdAt: string;
 };
 
-type LocationFeedback = {
+type LocalStatus = {
   tone: 'success' | 'warning' | 'error';
   text: string;
   detail?: string;
@@ -43,10 +43,17 @@ export default function TrainerAttendancePage() {
   );
   const [status, setStatus] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [locationFeedback, setLocationFeedback] = useState<LocationFeedback | null>(null);
+  const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const alreadyMarkedToday = Boolean(data?.hasApprovedTodayAttendance);
   const disableMarkAttendance = Boolean(data?.hasPendingTodayRequest || alreadyMarkedToday || submitting);
+  const activeBranchId = selectedBranchId || data?.gymBranches[0]?.id || '';
+
+  const selectedBranch = useMemo(
+    () => data?.gymBranches.find((branch) => branch.id === activeBranchId) || data?.gymBranches[0] || null,
+    [activeBranchId, data?.gymBranches]
+  );
 
   const todayLog = useMemo(
     () => data?.trainerAttendance.find((item) => item.date === today) || null,
@@ -57,13 +64,12 @@ export default function TrainerAttendancePage() {
     return <LoadingState title="Loading attendance screens" text="Fetching read-only member attendance and your own log." />;
   }
 
-  const markOwnAttendance = async () => {
-    setSubmitting(true);
+  const handleUseLocation = async () => {
     setStatus(null);
-    setLocationFeedback({
+    setLocalStatus({
       tone: 'warning',
-      text: 'Getting your location...',
-      detail: 'Allow location access so we can confirm which PowerHouse branch you are physically at.'
+      text: 'Checking your live location...',
+      detail: 'This helps choose the nearest branch automatically.'
     });
 
     try {
@@ -74,70 +80,85 @@ export default function TrainerAttendancePage() {
         accuracy: coords.accuracy
       }, data.gymBranches);
 
-      const activeBranch = preview?.matched || preview?.nearest || null;
-      if (!activeBranch) {
-        setStatus({
+      const branch = preview?.matched?.branch || preview?.nearest?.branch || null;
+      if (!branch) {
+        setLocalStatus({
           tone: 'error',
-          text: 'No gym branch is configured right now. Please contact the owner.'
+          text: 'We could not match your location to a branch.',
+          detail: 'Please choose the branch manually below.'
         });
         return;
       }
 
-      setLocationFeedback({
-        tone: activeBranch.withinRange ? 'success' : 'error',
-        text: activeBranch.withinRange
-          ? `You are inside the attendance zone for ${activeBranch.branch.label}.`
-          : `Nearest branch: ${activeBranch.branch.label} (${activeBranch.distanceLabel} away).`,
-        detail: `Allowed radius: ${formatDistanceLabel(activeBranch.branch.radiusMeters)}${coords.accuracy ? ` | GPS accuracy: ${formatDistanceLabel(coords.accuracy)}` : ''}`
+      setSelectedBranchId(branch.id);
+      setLocalStatus({
+        tone: preview?.matched ? 'success' : 'warning',
+        text: preview?.matched
+          ? `We selected ${branch.label} for you.`
+          : `Nearest branch selected: ${branch.label}.`,
+        detail: preview?.nearest
+          ? `Distance: ${preview.nearest.distanceLabel}${coords.accuracy ? ` | GPS accuracy: ${formatDistanceLabel(coords.accuracy)}` : ''}`
+          : 'You can still change the branch manually if needed.'
       });
-
-      if (!activeBranch.withinRange) {
-        setStatus({
-          tone: 'error',
-          text: `Move closer to ${activeBranch.branch.label} before sending your attendance request.`
-        });
-        return;
-      }
-
-      const result = await authedJsonRequest<RequestResponse>('/api/requests', session, {
-        method: 'POST',
-        body: JSON.stringify({
-          type: 'trainer-attendance',
-          data: {
-            date: today,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            accuracyMeters: coords.accuracy
-          }
-        })
-      });
-
-      if (!result.session || result.unauthorized) {
-        logout();
-        return;
-      }
-
-      setSession(result.session);
-      if (!result.ok) {
-        setStatus({ tone: 'error', text: result.error || 'Failed to create attendance request.' });
-        return;
-      }
-
-      setStatus({ tone: 'success', text: 'Attendance request submitted for owner approval.' });
-      await reload();
-    } catch (actionError) {
-      setStatus({
+    } catch (locationError) {
+      setLocalStatus({
         tone: 'error',
-        text: actionError instanceof Error ? actionError.message : 'Location permission is required to continue.'
+        text: locationError instanceof Error ? locationError.message : 'We could not read your location.',
+        detail: 'You can still choose your branch manually and send your request.'
       });
-      setLocationFeedback({
-        tone: 'error',
-        text: 'We could not read your location.',
-        detail: 'Turn on location services and try again while you are at a branch entrance or reception.'
-      });
-    } finally {
-      setSubmitting(false);
     }
+  };
+
+  const markOwnAttendance = async () => {
+    if (!selectedBranch) {
+      setStatus({ tone: 'error', text: 'Please choose your gym branch first.' });
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus(null);
+    setLocalStatus({
+      tone: 'warning',
+      text: `Sending attendance request for ${selectedBranch.label}...`,
+      detail: 'Please wait while we send this to the owner for approval.'
+    });
+
+    const result = await authedJsonRequest<RequestResponse>('/api/requests', session, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'trainer-attendance',
+        data: {
+          date: today,
+          branchId: selectedBranch.id
+        }
+      })
+    });
+
+    if (!result.session || result.unauthorized) {
+      logout();
+      return;
+    }
+
+    setSession(result.session);
+    if (!result.ok) {
+      setStatus({ tone: 'error', text: result.error || 'Failed to create attendance request.' });
+      setLocalStatus({
+        tone: 'error',
+        text: 'Attendance request could not be sent.',
+        detail: 'Please try again or contact the owner.'
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    setStatus({ tone: 'success', text: 'Attendance request submitted for owner approval.' });
+    setLocalStatus({
+      tone: 'success',
+      text: `Request submitted for ${selectedBranch.label}.`,
+      detail: 'You can track it from your requests screen.'
+    });
+    await reload();
+    setSubmitting(false);
   };
 
   return (
@@ -147,24 +168,27 @@ export default function TrainerAttendancePage() {
       <PageIntro
         eyebrow="Attendance"
         title="Read-only member attendance"
-        description="Review assigned-member attendance here, then send your own attendance request only when you are physically at either PowerHouse branch."
+        description="Review assigned-member attendance here, then choose your branch and send your own attendance request in one tap."
         actions={(
           <div className="action-cluster">
-            <button type="button" onClick={() => void markOwnAttendance()} disabled={disableMarkAttendance}>
-              {alreadyMarkedToday ? 'Already marked today' : data.hasPendingTodayRequest ? 'Request pending' : submitting ? 'Checking your location...' : 'Mark my attendance'}
+            <button type="button" className="ghost-button" onClick={() => void handleUseLocation()} disabled={submitting}>
+              Use my live location
+            </button>
+            <button type="button" onClick={() => void markOwnAttendance()} disabled={disableMarkAttendance || !selectedBranch}>
+              {alreadyMarkedToday ? 'Already marked today' : data.hasPendingTodayRequest ? 'Request pending' : submitting ? 'Sending request...' : 'Send attendance request'}
             </button>
           </div>
         )}
       />
 
       <section className="content-grid two-col">
-        <SurfaceCard eyebrow="Branch validation" title="Attendance works at both branches">
+        <SurfaceCard eyebrow="Branch selection" title="Choose the branch you are working from">
           <div className="location-status-card">
             <div className="location-status-head">
               <div>
-                <strong>{alreadyMarkedToday ? 'Today is already approved' : data.hasPendingTodayRequest ? 'Today is waiting for owner approval' : 'Location check required before requesting attendance'}</strong>
+                <strong>{alreadyMarkedToday ? 'Today is already approved' : data.hasPendingTodayRequest ? 'Today is waiting for owner approval' : 'Branch-based attendance request'}</strong>
                 <p className="subcopy">
-                  We validate your location against the nearest live branch before the request is sent to the owner.
+                  Choose the branch you are on duty at today. Live location is optional and only helps auto-select the nearest branch.
                 </p>
               </div>
               <StatusPill
@@ -180,32 +204,46 @@ export default function TrainerAttendancePage() {
               </div>
             ) : null}
 
-            {locationFeedback ? (
-              <div className={`location-feedback ${locationFeedback.tone}`}>
-                <strong>{locationFeedback.text}</strong>
-                {locationFeedback.detail ? <span>{locationFeedback.detail}</span> : null}
+            <label className="stack-form-label">
+              <span className="toolbar-label">Choose branch</span>
+              <select value={activeBranchId} onChange={(event) => setSelectedBranchId(event.target.value)}>
+                {data.gymBranches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {localStatus ? (
+              <div className={`location-feedback ${localStatus.tone}`}>
+                <strong>{localStatus.text}</strong>
+                {localStatus.detail ? <span>{localStatus.detail}</span> : null}
               </div>
             ) : (
               <div className="location-feedback neutral">
-                <strong>Tip</strong>
-                <span>Open directions if you are unsure which branch your phone GPS is locking onto.</span>
+                <strong>Quick tip</strong>
+                <span>Use the dropdown if you already know your branch. Live location is optional.</span>
               </div>
             )}
 
             <div className="branch-grid">
               {data.gymBranches.map((branch) => (
-                <article key={branch.id} className="branch-card">
+                <article key={branch.id} className={`branch-card ${activeBranchId === branch.id ? 'branch-card-active' : ''}`}>
                   <div className="branch-card-head">
                     <div className="branch-card-copy">
                       <strong>{branch.label}</strong>
-                      <span className="subcopy">Request radius: {formatDistanceLabel(branch.radiusMeters)}</span>
+                      <span className="subcopy">Attendance zone: {formatDistanceLabel(branch.radiusMeters)}</span>
                     </div>
-                    <StatusPill label="Trainer access" tone="success" />
+                    <StatusPill label={activeBranchId === branch.id ? 'Selected' : 'Available'} tone={activeBranchId === branch.id ? 'success' : 'default'} />
                   </div>
                   <p className="subcopy">
-                    Trainer attendance requests are accepted from this branch when you are physically inside the allowed zone.
+                    Use this branch when sending your daily attendance request.
                   </p>
                   <div className="branch-card-actions">
+                    <button type="button" className="ghost-button" onClick={() => setSelectedBranchId(branch.id)}>
+                      Choose branch
+                    </button>
                     <button type="button" className="ghost-button" onClick={() => openBranchDirections(branch)}>
                       Open directions
                     </button>
@@ -220,7 +258,7 @@ export default function TrainerAttendancePage() {
           <div className="timeline-list dense">
             <div className="timeline-item">
               <strong>Need help?</strong>
-              <span>{data.hasPendingTodayRequest ? 'Your request for today is already waiting on owner approval.' : alreadyMarkedToday ? 'Your attendance for today is already approved.' : 'Send one attendance request once you are at the gym.'}</span>
+              <span>{data.hasPendingTodayRequest ? 'Your request for today is already waiting on owner approval.' : alreadyMarkedToday ? 'Your attendance for today is already approved.' : 'Choose your branch and send one request for today.'}</span>
               <Link href="/trainer/requests" className="text-link">Open requests</Link>
             </div>
             {data.trainerAttendance.map((item) => (

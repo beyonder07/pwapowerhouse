@@ -22,12 +22,6 @@ type ClientAttendancePayload = {
   recent: Array<{ id: number; date: string; checkInTime: string; status: string }>;
 };
 
-type LocationFeedback = {
-  tone: 'success' | 'warning' | 'error';
-  text: string;
-  detail?: string;
-};
-
 type CheckInResponse = {
   success?: boolean;
   alreadyCheckedIn?: boolean;
@@ -39,29 +33,40 @@ type CheckInResponse = {
   branchLabel?: string;
 };
 
+type LocalStatus = {
+  tone: 'success' | 'warning' | 'error';
+  text: string;
+  detail?: string;
+};
+
 export default function ClientAttendancePage() {
   const { data, loading, error, session, setSession, logout, reload } = useAuthedPageData<ClientAttendancePayload>(
     '/api/data/client/attendance',
     CLIENT_ROLES
   );
   const [checkingIn, setCheckingIn] = useState(false);
-  const [actionNotice, setActionNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
-  const [locationFeedback, setLocationFeedback] = useState<LocationFeedback | null>(null);
+  const [status, setStatus] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
 
   const cells = useMemo(() => data ? buildCalendar(data.calendar.month, data.calendar.entries) : [], [data]);
   const checkedInToday = data?.todayAttendance?.status === 'present';
+  const activeBranchId = selectedBranchId || data?.gymBranches[0]?.id || '';
+  const selectedBranch = useMemo(
+    () => data?.gymBranches.find((branch) => branch.id === activeBranchId) || data?.gymBranches[0] || null,
+    [activeBranchId, data?.gymBranches]
+  );
 
   if (loading || !data) {
     return <LoadingState title="Loading attendance calendar" text="Preparing your visit timeline for this month." />;
   }
 
-  const handleCheckIn = async () => {
-    setCheckingIn(true);
-    setActionNotice(null);
-    setLocationFeedback({
+  const handleUseLocation = async () => {
+    setStatus(null);
+    setLocalStatus({
       tone: 'warning',
-      text: 'Getting your location...',
-      detail: 'Please allow location access so we can confirm which PowerHouse branch you are visiting.'
+      text: 'Checking your live location...',
+      detail: 'This helps choose the nearest branch automatically.'
     });
 
     try {
@@ -72,113 +77,118 @@ export default function ClientAttendancePage() {
         accuracy: coords.accuracy
       }, data.gymBranches);
 
-      const activeBranch = preview?.matched || preview?.nearest || null;
-      if (!activeBranch) {
-        setActionNotice({
+      const branch = preview?.matched?.branch || preview?.nearest?.branch || null;
+      if (!branch) {
+        setLocalStatus({
           tone: 'error',
-          text: 'No gym branch is configured right now. Please contact the gym desk.'
-        });
-        setLocationFeedback({
-          tone: 'error',
-          text: 'We could not match your check-in to a branch.',
-          detail: 'Please contact the gym desk before trying again.'
+          text: 'We could not match your location to a branch.',
+          detail: 'Please choose the branch manually below.'
         });
         return;
       }
 
-      setLocationFeedback({
-        tone: activeBranch.withinRange ? 'success' : 'error',
-        text: activeBranch.withinRange
-          ? `You are inside the check-in zone for ${activeBranch.branch.label}.`
-          : `Nearest branch: ${activeBranch.branch.label} (${activeBranch.distanceLabel} away).`,
-        detail: `Allowed radius: ${formatDistanceLabel(activeBranch.branch.radiusMeters)}${coords.accuracy ? ` | GPS accuracy: ${formatDistanceLabel(coords.accuracy)}` : ''}`
+      setSelectedBranchId(branch.id);
+      setLocalStatus({
+        tone: preview?.matched ? 'success' : 'warning',
+        text: preview?.matched
+          ? `We selected ${branch.label} for you.`
+          : `Nearest branch selected: ${branch.label}.`,
+        detail: preview?.nearest
+          ? `Distance: ${preview.nearest.distanceLabel}${coords.accuracy ? ` | GPS accuracy: ${formatDistanceLabel(coords.accuracy)}` : ''}`
+          : 'You can still change the branch manually if needed.'
       });
-
-      if (!activeBranch.withinRange) {
-        setActionNotice({
-          tone: 'error',
-          text: `Move closer to ${activeBranch.branch.label} before checking in.`
-        });
-        return;
-      }
-
-      const result = await authedJsonRequest<CheckInResponse>('/api/attendance/client/check-in', session, {
-        method: 'POST',
-        body: JSON.stringify({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracyMeters: coords.accuracy
-        })
-      });
-
-      if (!result.session || result.unauthorized) {
-        logout();
-        return;
-      }
-
-      setSession(result.session);
-      if (!result.ok || !result.data) {
-        setActionNotice({ tone: 'error', text: result.error || 'Could not complete the check-in.' });
-        return;
-      }
-
-      setLocationFeedback({
-        tone: 'success',
-        text: result.data.branchLabel
-          ? `Check-in confirmed at ${result.data.branchLabel}.`
-          : 'Check-in confirmed.',
-        detail: result.data.distanceLabel
-          ? `You were ${result.data.distanceLabel} from the branch when your attendance was marked.`
-          : 'Your visit has been recorded for today.'
-      });
-
-      setActionNotice({
-        tone: 'success',
-        text: result.data.alreadyCheckedIn
-          ? 'Your attendance was already marked for today.'
-          : 'Check-in successful. Your attendance is marked for today.'
-      });
-      await reload();
-    } catch (actionError) {
-      setActionNotice({
+    } catch (locationError) {
+      setLocalStatus({
         tone: 'error',
-        text: actionError instanceof Error ? actionError.message : 'Location permission is required to check in.'
+        text: locationError instanceof Error ? locationError.message : 'We could not read your location.',
+        detail: 'You can still choose your branch manually and check in.'
       });
-      setLocationFeedback({
-        tone: 'error',
-        text: 'We could not read your location.',
-        detail: 'Turn on location services and try again near a gym entrance.'
-      });
-    } finally {
-      setCheckingIn(false);
     }
+  };
+
+  const handleCheckIn = async () => {
+    if (!selectedBranch) {
+      setStatus({ tone: 'error', text: 'Please choose your gym branch first.' });
+      return;
+    }
+
+    setCheckingIn(true);
+    setStatus(null);
+    setLocalStatus({
+      tone: 'warning',
+      text: `Marking attendance for ${selectedBranch.label}...`,
+      detail: 'Please wait while we record your visit.'
+    });
+
+    const result = await authedJsonRequest<CheckInResponse>('/api/attendance/client/check-in', session, {
+      method: 'POST',
+      body: JSON.stringify({
+        branchId: selectedBranch.id
+      })
+    });
+
+    if (!result.session || result.unauthorized) {
+      logout();
+      return;
+    }
+
+    setSession(result.session);
+    if (!result.ok || !result.data) {
+      setStatus({ tone: 'error', text: result.error || 'Could not complete the check-in.' });
+      setLocalStatus({
+        tone: 'error',
+        text: 'Attendance could not be marked.',
+        detail: 'Please try again or contact the gym desk.'
+      });
+      setCheckingIn(false);
+      return;
+    }
+
+    setStatus({
+      tone: 'success',
+      text: result.data.alreadyCheckedIn
+        ? 'Your attendance was already marked for today.'
+        : 'Check-in successful. Your attendance is marked for today.'
+    });
+    setLocalStatus({
+      tone: 'success',
+      text: result.data.branchLabel
+        ? `Attendance recorded for ${result.data.branchLabel}.`
+        : 'Attendance recorded successfully.',
+      detail: 'You can see the updated entry below in your visit history.'
+    });
+    await reload();
+    setCheckingIn(false);
   };
 
   return (
     <main className="page-stack">
       {error ? <Notice tone="error" text={error} /> : null}
-      {actionNotice ? <Notice tone={actionNotice.tone} text={actionNotice.text} /> : null}
+      {status ? <Notice tone={status.tone} text={status.text} /> : null}
       <PageIntro
         eyebrow="Attendance"
         title="Monthly attendance"
-        description="Check in from either PowerHouse branch, open directions in one tap, and keep your visit history in one place."
+        description="Choose your branch, mark attendance in one tap, and use live location only if you want help picking the nearest branch."
         actions={(
           <div className="action-cluster">
-            <button type="button" onClick={() => void handleCheckIn()} disabled={checkingIn || checkedInToday}>
-              {checkedInToday ? 'Checked in today' : checkingIn ? 'Checking your location...' : 'Check in now'}
+            <button type="button" className="ghost-button" onClick={() => void handleUseLocation()} disabled={checkingIn}>
+              Use my live location
+            </button>
+            <button type="button" onClick={() => void handleCheckIn()} disabled={checkingIn || checkedInToday || !selectedBranch}>
+              {checkedInToday ? 'Checked in today' : checkingIn ? 'Marking attendance...' : 'Mark attendance'}
             </button>
           </div>
         )}
       />
 
       <section className="content-grid two-col">
-        <SurfaceCard eyebrow="Branch check-in" title="Check in at any PowerHouse branch">
+        <SurfaceCard eyebrow="Branch check-in" title="Choose your branch">
           <div className="location-status-card">
             <div className="location-status-head">
               <div>
-                <strong>{checkedInToday ? 'Today is already marked' : 'Use your live location to check in'}</strong>
+                <strong>{checkedInToday ? 'Today is already marked' : 'Simple branch-based attendance'}</strong>
                 <p className="subcopy">
-                  We match you to the nearest branch automatically and only allow attendance when you are inside that branch radius.
+                  Pick the branch you are visiting and tap the main button. If you want help, use live location to auto-select the nearest branch.
                 </p>
               </div>
               <StatusPill
@@ -194,32 +204,46 @@ export default function ClientAttendancePage() {
               </div>
             ) : null}
 
-            {locationFeedback ? (
-              <div className={`location-feedback ${locationFeedback.tone}`}>
-                <strong>{locationFeedback.text}</strong>
-                {locationFeedback.detail ? <span>{locationFeedback.detail}</span> : null}
+            <label className="stack-form-label">
+              <span className="toolbar-label">Choose branch</span>
+              <select value={activeBranchId} onChange={(event) => setSelectedBranchId(event.target.value)}>
+                {data.gymBranches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {localStatus ? (
+              <div className={`location-feedback ${localStatus.tone}`}>
+                <strong>{localStatus.text}</strong>
+                {localStatus.detail ? <span>{localStatus.detail}</span> : null}
               </div>
             ) : (
               <div className="location-feedback neutral">
-                <strong>Tip</strong>
-                <span>Stand near the reception or entrance of either branch for the cleanest GPS lock.</span>
+                <strong>Quick tip</strong>
+                <span>Using the branch dropdown is enough. Live location is optional and only helps if you are unsure which branch to choose.</span>
               </div>
             )}
 
             <div className="branch-grid">
               {data.gymBranches.map((branch) => (
-                <article key={branch.id} className="branch-card">
+                <article key={branch.id} className={`branch-card ${activeBranchId === branch.id ? 'branch-card-active' : ''}`}>
                   <div className="branch-card-head">
                     <div className="branch-card-copy">
                       <strong>{branch.label}</strong>
-                      <span className="subcopy">Live attendance radius: {formatDistanceLabel(branch.radiusMeters)}</span>
+                      <span className="subcopy">Attendance zone: {formatDistanceLabel(branch.radiusMeters)}</span>
                     </div>
-                    <StatusPill label="Directions ready" tone="success" />
+                    <StatusPill label={activeBranchId === branch.id ? 'Selected' : 'Available'} tone={activeBranchId === branch.id ? 'success' : 'default'} />
                   </div>
                   <p className="subcopy">
-                    Attendance works here for members. Tap directions if you want the fastest route from your phone.
+                    Use this branch if this is where you are training today.
                   </p>
                   <div className="branch-card-actions">
+                    <button type="button" className="ghost-button" onClick={() => setSelectedBranchId(branch.id)}>
+                      Choose branch
+                    </button>
                     <button type="button" className="ghost-button" onClick={() => openBranchDirections(branch)}>
                       Open directions
                     </button>

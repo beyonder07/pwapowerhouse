@@ -39,6 +39,15 @@ type PaymentRow = {
   date: string;
 };
 
+type ActivityAuditRow = {
+  id: number;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  details: Record<string, unknown> | null;
+  created_at: string;
+};
+
 type AttendanceRow = {
   id: number;
   member_id: number;
@@ -381,6 +390,16 @@ export async function getOwnerTrainersList(params: ListQuery) {
 export async function getOwnerPaymentsList(params: ListQuery) {
   const admin = createAdminSupabaseClient();
   const totalCount = await countRows('payments');
+  const { count: pendingPaymentsCount, error: pendingCountError } = await admin
+    .from('payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending');
+
+  if (pendingCountError) {
+    throw new Error(pendingCountError.message);
+  }
+
+  const pendingCount = pendingPaymentsCount || 0;
   const search = params.query.trim();
   const sanitized = sanitizeSearchTerm(search);
   const numericSearch = asNumeric(search);
@@ -406,6 +425,7 @@ export async function getOwnerPaymentsList(params: ListQuery) {
       items: [],
       totalsByMode: [],
       totalCollected: 0,
+      pendingCount,
       ...buildPagedMeta(totalCount, 0, params.page, params.pageSize)
     };
   }
@@ -437,6 +457,28 @@ export async function getOwnerPaymentsList(params: ListQuery) {
   }
 
   const payments = (rows || []) as PaymentRow[];
+
+  const paymentAuditRes = payments.length
+    ? await admin
+      .from('activity_audits')
+      .select('id, entity_type, entity_id, action, details, created_at')
+      .eq('entity_type', 'payment')
+      .in('entity_id', payments.map((row) => String(row.id)))
+      .order('created_at', { ascending: false })
+    : { data: [], error: null };
+
+  if (paymentAuditRes.error) {
+    throw new Error(paymentAuditRes.error.message);
+  }
+
+  const paymentAuditMap = new Map<number, ActivityAuditRow>();
+  for (const audit of (paymentAuditRes.data || []) as ActivityAuditRow[]) {
+    const paymentId = Number(audit.entity_id || 0);
+    if (!paymentId || paymentAuditMap.has(paymentId)) {
+      continue;
+    }
+    paymentAuditMap.set(paymentId, audit);
+  }
 
   const nestedPaymentsRes = payments.length
     ? await admin
@@ -494,10 +536,14 @@ export async function getOwnerPaymentsList(params: ListQuery) {
       amount: Number(payment.amount || 0),
       paymentMode: String(payment.mode || ''),
       date: String(payment.date || ''),
-      status: String(payment.status || '')
+      status: String(payment.status || ''),
+      branchLabel: String((paymentAuditMap.get(Number(payment.id || 0))?.details?.branchLabel as string) || ''),
+      proofUrl: String((paymentAuditMap.get(Number(payment.id || 0))?.details?.proofUrl as string) || ''),
+      note: String((paymentAuditMap.get(Number(payment.id || 0))?.details?.note as string) || '')
     })),
     totalsByMode,
     totalCollected,
+    pendingCount,
     ...meta
   };
 }

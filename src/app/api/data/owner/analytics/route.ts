@@ -9,7 +9,9 @@ export async function GET(request: Request) {
   }
   try {
     await requireAuthorizedUser(request, ['owner']);
-    return NextResponse.json(await getOwnerAnalyticsSnapshot());
+    const { searchParams } = new URL(request.url);
+    const branch = searchParams.get('branch') || 'all';
+    return NextResponse.json(await getOwnerAnalyticsSnapshot(branch));
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unauthorized' }, { status: 401 });
   }

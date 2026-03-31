@@ -1,10 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { BrandLogo, ThemeToggle, useThemeState } from './chrome';
-import { InstallAppButton } from './pwa-provider';
-import { clearSession } from '../lib/auth';
+import { authedJson } from '../lib/app-client';
+import { getStoredSession, logoutToHome } from '../lib/auth';
 
 type RoleType = 'client' | 'trainer' | 'owner';
 
@@ -45,9 +46,9 @@ const roleMeta: Record<RoleType, { eyebrow: string; title: string; description: 
     ]
   },
   owner: {
-    eyebrow: 'Owner Control',
-    title: 'PowerHouse command center',
-    description: 'Analytics, approvals, finances, staff, and full operational control.',
+    eyebrow: 'Owner dashboard',
+    title: 'Owner app',
+    description: 'See members, payments, attendance, and requests for your gym in one place.',
     accentClass: 'owner-theme',
     items: [
       { href: '/owner', label: 'Overview', shortLabel: 'Home' },
@@ -71,83 +72,144 @@ function isItemActive(pathname: string, href: string) {
 
 export function RoleAppShell({ role, children }: { role: RoleType; children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
   const { theme, toggleTheme } = useThemeState();
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
   const meta = roleMeta[role];
   const activeItem = meta.items.find((item) => isItemActive(pathname, item.href)) || meta.items[0];
-  const handleLogout = () => {
-    clearSession();
-    router.replace('/');
+
+  useEffect(() => {
+    document.documentElement.dataset.appShell = 'true';
+    document.body.dataset.appShell = 'true';
+
+    return () => {
+      delete document.documentElement.dataset.appShell;
+      delete document.body.dataset.appShell;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (role !== 'owner') {
+      return;
+    }
+
+    const session = getStoredSession();
+    if (!session.accessToken) {
+      return;
+    }
+
+    let active = true;
+
+    const loadPendingApprovals = async () => {
+      const result = await authedJson<{ sync?: { pendingRequests?: number } }>('/api/data/owner/overview', session);
+      if (!active || !result.ok || !result.data) {
+        return;
+      }
+
+      setPendingApprovals(Number(result.data.sync?.pendingRequests || 0));
+    };
+
+    void loadPendingApprovals();
+
+    return () => {
+      active = false;
+    };
+  }, [pathname, role]);
+
+  const handleLogout = async () => {
+    if (loggingOut) {
+      return;
+    }
+
+    setLoggingOut(true);
+    await logoutToHome();
   };
 
   return (
-    <div className={`app-shell ${meta.accentClass}`}>
-      <aside className="app-sidebar">
-        <div className="sidebar-brand">
-          <BrandLogo />
-          <div>
-            <p className="eyebrow">{meta.eyebrow}</p>
-            <h1>{meta.title}</h1>
-            <p className="subcopy">{meta.description}</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav" aria-label={`${role} navigation`}>
-          {meta.items.map((item) => {
-            const active = isItemActive(pathname, item.href);
-            return (
-              <Link key={item.href} href={item.href} className={`nav-link ${active ? 'active' : ''}`}>
-                <span className="nav-link-label">{item.label}</span>
-                <span className="nav-link-pill">{item.shortLabel}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-footer">
-          <InstallAppButton className="ghost-button" label="Install PowerHouse" />
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <button type="button" className="ghost-button" onClick={handleLogout}>Logout</button>
-        </div>
-      </aside>
-
-      <div className="app-main">
-        <header className="app-header">
-          <div className="header-brand">
+    <div className={`app-shell-shell ${meta.accentClass}`}>
+      <div className="app-shell">
+        <aside className="app-sidebar">
+          <div className="sidebar-brand">
             <BrandLogo />
             <div>
               <p className="eyebrow">{meta.eyebrow}</p>
-              <h2>{activeItem.label}</h2>
+              <h1>{meta.title}</h1>
+              <p className="subcopy">{meta.description}</p>
             </div>
           </div>
-          <div className="header-actions">
-            <div className="header-role-chip">{role.toUpperCase()}</div>
-            <InstallAppButton className="ghost-button" label="Install App" />
-          </div>
-        </header>
 
-        <div className="page-scroll-area">{children}</div>
-      </div>
-
-      <div className="mobile-footer-shell">
-        <div className="mobile-action-row">
-          <InstallAppButton className="ghost-button compact-header-button" compact label="Install" />
-          <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
-          <button type="button" className="ghost-button compact-header-button" onClick={handleLogout}>Logout</button>
-        </div>
-        <nav className="mobile-nav" aria-label={`${role} mobile navigation`}>
-          <div className="mobile-nav-scroll">
+          <nav className="sidebar-nav" aria-label={`${role} navigation`}>
             {meta.items.map((item) => {
               const active = isItemActive(pathname, item.href);
+              const showPendingBadge = role === 'owner' && item.href === '/owner/requests' && pendingApprovals > 0;
               return (
-                <Link key={item.href} href={item.href} className={`mobile-nav-link ${active ? 'active' : ''}`}>
-                  <span className="mobile-dot" aria-hidden="true" />
-                  <span>{item.shortLabel}</span>
+                <Link key={item.href} href={item.href} className={`nav-link ${active ? 'active' : ''}`}>
+                  <span className="nav-link-label">
+                    {item.label}
+                    {showPendingBadge ? <span className="nav-link-count">{pendingApprovals}</span> : null}
+                  </span>
                 </Link>
               );
             })}
+          </nav>
+
+          <div className="sidebar-footer">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <button type="button" className="ghost-button" onClick={() => void handleLogout()} disabled={loggingOut}>
+              {loggingOut ? 'Logging out...' : 'Logout'}
+            </button>
           </div>
-        </nav>
+        </aside>
+
+        <div className="app-main">
+          <header className="app-header">
+            <div className="app-header-frame">
+              <div className="header-brand">
+                <div className="header-brand-mark">
+                  <BrandLogo />
+                </div>
+                <div>
+                  <p className="eyebrow">{meta.eyebrow}</p>
+                  <h2>{activeItem.label}</h2>
+                  <p className="header-page-note">{meta.description}</p>
+                </div>
+              </div>
+              <div className="header-actions">
+                <div className="header-role-chip">{role.toUpperCase()}</div>
+              </div>
+            </div>
+          </header>
+
+          <main className="page-scroll-area">
+            <div className="page-content-frame">{children}</div>
+          </main>
+        </div>
+
+        <div className="mobile-footer-shell">
+          <div className="mobile-action-row">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} compact />
+            <button type="button" className="ghost-button compact-header-button" onClick={() => void handleLogout()} disabled={loggingOut}>
+              {loggingOut ? '...' : 'Logout'}
+            </button>
+          </div>
+          <nav className="mobile-nav" aria-label={`${role} mobile navigation`}>
+            <div className="mobile-nav-scroll">
+              {meta.items.map((item) => {
+                const active = isItemActive(pathname, item.href);
+                const showPendingBadge = role === 'owner' && item.href === '/owner/requests' && pendingApprovals > 0;
+                return (
+                  <Link key={item.href} href={item.href} className={`mobile-nav-link ${active ? 'active' : ''}`}>
+                    <span className="mobile-dot" aria-hidden="true" />
+                    <span className="mobile-nav-label">
+                      {item.shortLabel}
+                      {showPendingBadge ? <span className="mobile-nav-count">{pendingApprovals}</span> : null}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { LoadingState, MetricGrid, Notice, PageIntro, SurfaceCard, StatusPill } from '../../components/app-ui';
 import { useAuthedPageData } from '../../lib/app-client';
 import { currency, formatDate } from '../../lib/formatters';
 import type { ViewerRole } from '../../lib/auth';
+import { formatMonthlyFeeRangeWithUnit } from '../../lib/fee-config';
 
 const CLIENT_ROLES: ViewerRole[] = ['client'];
 
@@ -38,7 +38,8 @@ export default function ClientOverviewPage() {
         items={[
           { label: 'Days Remaining', value: String(data.membership?.daysRemaining ?? 0), tone: data.membership?.daysRemaining && data.membership.daysRemaining <= 7 ? 'warning' : 'default' },
           { label: 'Visits This Month', value: String(data.attendanceSummary.presentCount), tone: 'success' },
-          { label: 'Last Payment', value: data.latestPayment ? currency(data.latestPayment.amount) : '-' }
+          { label: 'Last Payment', value: data.latestPayment ? currency(data.latestPayment.amount) : '-' },
+          { label: 'Typical Monthly Fee', value: formatMonthlyFeeRangeWithUnit() }
         ]}
       />
 
@@ -49,7 +50,7 @@ export default function ClientOverviewPage() {
             <div><span>Expiry</span><strong>{formatDate(data.membership?.expiryDate)}</strong></div>
             <div><span>Trainer</span><strong>{data.assignedTrainer?.name || 'Not assigned'}</strong></div>
           </div>
-          <Link href="/client/membership" className="text-link">Open membership details</Link>
+          <p className="subcopy">PowerHouse monthly membership fees usually stay between {formatMonthlyFeeRangeWithUnit()} depending on the plan you are on.</p>
         </SurfaceCard>
 
         <SurfaceCard eyebrow="Workout" title="Today's focus">
@@ -60,7 +61,6 @@ export default function ClientOverviewPage() {
               {!(data.workoutPlan?.exercises || []).length ? <li>Check back after your trainer assigns your routine.</li> : null}
             </ul>
           </div>
-          <Link href="/client/workout" className="text-link">View workout plan</Link>
         </SurfaceCard>
 
         <SurfaceCard eyebrow="Payments" title="Latest payment">
@@ -69,7 +69,6 @@ export default function ClientOverviewPage() {
             <div><span>Mode</span><strong>{data.latestPayment?.paymentMode || '-'}</strong></div>
             <div><span>Date</span><strong>{formatDate(data.latestPayment?.date)}</strong></div>
           </div>
-          <Link href="/client/payments" className="text-link">Open payment history</Link>
         </SurfaceCard>
 
         <SurfaceCard eyebrow="Attendance" title="This month">
@@ -77,16 +76,6 @@ export default function ClientOverviewPage() {
             <div><span>Month</span><strong>{data.attendanceSummary.month}</strong></div>
             <div><span>Present</span><strong>{data.attendanceSummary.presentCount}</strong></div>
             <div><span>Recorded Days</span><strong>{data.attendanceSummary.totalRecorded}</strong></div>
-          </div>
-          <Link href="/client/attendance" className="text-link">Open attendance calendar</Link>
-        </SurfaceCard>
-
-        <SurfaceCard eyebrow="Quick actions" title="Go where you need">
-          <div className="timeline-list dense">
-            <Link href="/client/profile" className="text-link">Update profile</Link>
-            <Link href="/client/membership" className="text-link">Check membership</Link>
-            <Link href="/client/payments" className="text-link">See payment history</Link>
-            <Link href="/client/workout" className="text-link">Open workout plan</Link>
           </div>
         </SurfaceCard>
       </section>

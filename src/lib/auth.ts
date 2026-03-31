@@ -67,6 +67,21 @@ export function clearSession() {
   clearClientCookie(REFRESH_TOKEN_COOKIE);
 }
 
+export async function logoutToHome() {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+  } catch {
+  } finally {
+    clearSession();
+    if (typeof window !== 'undefined') {
+      window.location.assign('/');
+    }
+  }
+}
+
 export async function refreshSession(refreshToken: string, currentRole?: ViewerRole) {
   if (!refreshToken) {
     return null;
