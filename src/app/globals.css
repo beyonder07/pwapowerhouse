@@ -2112,10 +2112,13 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .owner-focus-box {
-  flex: 1 1 180px;
+  flex: 1 1 clamp(170px, 24vw, 240px);
+  max-width: min(100%, 320px);
   min-width: 0;
   display: grid;
   gap: 4px;
@@ -2141,8 +2144,11 @@ button:disabled {
 }
 
 .owner-mode-list {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .owner-mode-row {
@@ -2150,6 +2156,13 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) minmax(100px, 1.5fr) auto;
   align-items: center;
   gap: 10px;
+  flex: 1 1 clamp(240px, 32vw, 340px);
+  max-width: min(100%, 420px);
+  min-height: 92px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-muted) 72%, var(--surface-strong));
 }
 
 .owner-mode-copy {
@@ -2184,13 +2197,18 @@ button:disabled {
 }
 
 .owner-focus-grid {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .owner-focus-panel {
   display: grid;
   gap: 6px;
+  flex: 1 1 clamp(180px, 28vw, 250px);
+  max-width: min(100%, 340px);
   padding: 14px;
   border-radius: 18px;
   border: 1px solid var(--border);
@@ -2240,6 +2258,8 @@ button:disabled {
   flex-wrap: wrap;
   gap: 12px;
   align-content: flex-start;
+  align-items: stretch;
+  justify-content: flex-start;
 }
 
 .analytics-box-grid > .subcopy {
@@ -2254,7 +2274,8 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex: 1 1 150px;
+  flex: 1 1 clamp(150px, 20vw, 210px);
+  max-width: min(100%, 280px);
   min-height: 132px;
   min-width: 0;
   padding: 14px;
@@ -2403,7 +2424,8 @@ button:disabled {
 }
 
 .payment-mode-box {
-  flex-basis: 160px;
+  flex-basis: clamp(150px, 20vw, 200px);
+  max-width: min(100%, 250px);
   min-height: 136px;
 }
 
@@ -3066,6 +3088,7 @@ button:disabled {
   .owner-mode-row {
     grid-template-columns: 1fr;
     gap: 8px;
+    max-width: none;
   }
 
   .owner-mode-share {
@@ -3226,6 +3249,13 @@ button:disabled {
 
   .owner-focus-box {
     flex-basis: 100%;
+    max-width: none;
+  }
+
+  .owner-focus-panel,
+  .analytics-box,
+  .payment-mode-box {
+    max-width: none;
   }
 
   .analytics-chart-meta {

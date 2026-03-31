@@ -246,7 +246,7 @@ export default function OwnerAnalyticsPage() {
             </article>
             <article className="owner-focus-panel">
               <span>Best month in trend</span>
-              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} · ${currency(strongestRevenueMonth.value)}` : 'No revenue yet'}</strong>
+              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} - ${currency(strongestRevenueMonth.value)}` : 'No revenue yet'}</strong>
               <p className="subcopy">Highest collection point inside the visible monthly trend.</p>
             </article>
             <article className="owner-focus-panel">
@@ -266,7 +266,7 @@ export default function OwnerAnalyticsPage() {
             </article>
             <article className="owner-focus-panel">
               <span>Top payment mode</span>
-              <strong>{strongestMode ? `${strongestMode.label} · ${strongestMode.share}%` : 'No payment mode yet'}</strong>
+              <strong>{strongestMode ? `${strongestMode.label} - ${strongestMode.share}%` : 'No payment mode yet'}</strong>
               <p className="subcopy">Current dominant mode of collection this month.</p>
             </article>
             <article className="owner-focus-panel">
@@ -298,7 +298,7 @@ export default function OwnerAnalyticsPage() {
             </div>
             <div className="owner-focus-box">
               <span>Best month</span>
-              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} · ${currency(strongestRevenueMonth.value)}` : 'No data yet'}</strong>
+              <strong>{strongestRevenueMonth ? `${strongestRevenueMonth.label} - ${currency(strongestRevenueMonth.value)}` : 'No data yet'}</strong>
             </div>
           </div>
         </SurfaceCard>
@@ -327,7 +327,7 @@ export default function OwnerAnalyticsPage() {
             </div>
             <div className="owner-focus-box">
               <span>Best day</span>
-              <strong>{attendanceSummary.bestDay ? `${attendanceSummary.bestDay.label} · ${attendanceSummary.bestDay.present} present` : 'No data yet'}</strong>
+              <strong>{attendanceSummary.bestDay ? `${attendanceSummary.bestDay.label} - ${attendanceSummary.bestDay.present} present` : 'No data yet'}</strong>
             </div>
           </div>
         </SurfaceCard>
