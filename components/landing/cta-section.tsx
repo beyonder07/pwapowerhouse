@@ -13,7 +13,7 @@ export function CTASection() {
   const { isInstallable, installPwa } = usePwaInstall()
 
   return (
-    <section className="py-24 lg:py-32 relative overflow-hidden bg-gradient-to-b from-background/75 to-slate-950/85 backdrop-blur-[2px]">
+    <section id="cta" className="py-24 lg:py-32 relative overflow-hidden bg-gradient-to-b from-background/75 to-slate-950/85 backdrop-blur-[2px]">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
           ref={ref}
