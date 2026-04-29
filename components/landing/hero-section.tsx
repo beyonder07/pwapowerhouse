@@ -22,7 +22,7 @@ export function HeroSection() {
             className="space-y-6 md:space-y-8"
           >
             <h1 className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight text-balance">
-              A fitness movement that is worth breaking a sweat for
+              Strength isn’t given. It’s forged.
             </h1>
 
             <motion.p
