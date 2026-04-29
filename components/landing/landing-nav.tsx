@@ -60,6 +60,14 @@ export function LandingNav() {
 
             {/* Desktop CTAs */}
             <div className="hidden md:flex items-center gap-3">
+              <Button variant="ghost" asChild className="text-accent hover:text-accent hover:bg-accent/10">
+                <Link href="#cta" onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' });
+                }}>
+                  Download App
+                </Link>
+              </Button>
               <Button variant="ghost" asChild>
                 <Link href="/login">Login</Link>
               </Button>
