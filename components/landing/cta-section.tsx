@@ -37,16 +37,14 @@ export function CTASection() {
               </Link>
             </Button>
             
-            {isInstallable && (
-              <Button 
-                onClick={installPwa}
-                variant="outline" 
-                className="border-accent text-accent hover:bg-accent hover:text-white h-9 md:h-11 px-4 md:px-8 text-sm md:text-base"
-              >
-                <Smartphone className="mr-2 h-4 md:h-5 w-4 md:w-5" />
-                Add to Home Screen
-              </Button>
-            )}
+            <Button 
+              onClick={installPwa}
+              variant="outline" 
+              className="border-accent text-accent hover:bg-accent hover:text-white h-9 md:h-11 px-4 md:px-8 text-sm md:text-base"
+            >
+              <Smartphone className="mr-2 h-4 md:h-5 w-4 md:w-5" />
+              {isInstallable ? "Add to Home Screen" : "How to Install App"}
+            </Button>
 
             <Button variant="outline" asChild className="border-slate-600 text-foreground hover:bg-slate-800 h-9 md:h-11 px-4 md:px-8 text-sm md:text-base">
               <Link href="/signup/trainer">
