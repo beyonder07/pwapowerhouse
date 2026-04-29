@@ -31,7 +31,7 @@ export function HeroSection() {
               transition={{ duration: 0.8, delay: 0.15 }}
               className="text-base md:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed"
             >
-              Unlimited access to expert trainers, group classes, and premium facilities
+              A space designed for those who demand more from themselves.
             </motion.p>
 
             {/* CTA Buttons */}
