@@ -14,7 +14,7 @@ import {
 
 export default function LandingPage() {
   return (
-    <div className="app-screen relative bg-background">
+    <div className="app-shell landing-page relative bg-background">
       <div className="fixed inset-0 z-0 pointer-events-none">
         <video
           className="h-full w-full object-cover object-center"
@@ -32,18 +32,16 @@ export default function LandingPage() {
       </div>
 
       <LandingNav />
-      <div className="app-scroll safe-bottom relative z-10">
-        <main>
-          <HeroSection />
-          <BranchesSection />
-          <WhySection />
-          <PlansSection />
-          <FacilitiesSection />
-          <ResultsSection />
-          <CTASection />
-        </main>
+      <main className="page-scroll relative z-10">
+        <HeroSection />
+        <BranchesSection />
+        <WhySection />
+        <PlansSection />
+        <FacilitiesSection />
+        <ResultsSection />
+        <CTASection />
         <Footer />
-      </div>
+      </main>
     </div>
   )
 }

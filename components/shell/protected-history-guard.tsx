@@ -27,21 +27,28 @@ export function ProtectedHistoryGuard() {
     if (!isStandalonePwa()) return
 
     const pushGuardState = () => {
+      const currentPath = currentPathRef.current
+
       window.history.replaceState(
         { ...window.history.state, powerhouseProtected: true },
         "",
-        window.location.href
+        currentPath
       )
       window.history.pushState(
         { ...window.history.state, powerhouseGuard: true },
         "",
-        window.location.href
+        currentPath
       )
     }
 
     const handlePopState = () => {
       const currentPath = currentPathRef.current
 
+      window.history.replaceState(
+        { ...window.history.state, powerhouseProtected: true },
+        "",
+        currentPath
+      )
       window.history.pushState(
         { ...window.history.state, powerhouseGuard: true },
         "",

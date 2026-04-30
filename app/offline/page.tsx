@@ -11,14 +11,14 @@ export default function OfflinePage() {
   }
 
   return (
-    <div className="safe-area-page flex flex-col bg-background">
+    <div className="app-shell safe-area-page bg-background">
       {/* Header */}
       <header className="p-4">
         <BrandLogo size="lg" />
       </header>
 
       {/* Content */}
-      <main className="app-scroll flex-1 px-4">
+      <main className="page-scroll px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

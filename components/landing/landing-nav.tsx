@@ -21,17 +21,15 @@ export function LandingNav() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const scroller = document.querySelector(".app-scroll")
-      setIsScrolled((scroller?.scrollTop ?? window.scrollY) > 50)
+      const scroller = document.querySelector(".page-scroll")
+      setIsScrolled((scroller?.scrollTop ?? 0) > 50)
     }
-    const scroller = document.querySelector(".app-scroll")
+    const scroller = document.querySelector(".page-scroll")
     scroller?.addEventListener("scroll", handleScroll, { passive: true })
-    window.addEventListener("scroll", handleScroll, { passive: true })
     handleScroll()
 
     return () => {
       scroller?.removeEventListener("scroll", handleScroll)
-      window.removeEventListener("scroll", handleScroll)
     }
   }, [])
 
@@ -44,7 +42,7 @@ export function LandingNav() {
     <>
       <header
         className={cn(
-          "safe-landing-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "site-header safe-landing-nav left-0 right-0 transition-all duration-300",
           isScrolled
             ? "bg-background/95 backdrop-blur-md border-b border-slate-800"
             : "bg-background/75 backdrop-blur-md"
