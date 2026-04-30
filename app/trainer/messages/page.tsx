@@ -150,7 +150,7 @@ export default function TrainerMessagesPage() {
       variants={container}
       initial="hidden"
       animate="show"
-      className="h-[calc(100vh-12rem)]"
+      className="h-[calc(100dvh-12rem)]"
     >
       <PageIntro
         title="Messages"

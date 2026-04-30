@@ -34,7 +34,7 @@ export function LandingNav() {
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "safe-landing-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300",
           isScrolled
             ? "bg-background/95 backdrop-blur-md border-b border-slate-800"
             : "bg-transparent"
@@ -102,7 +102,7 @@ export function LandingNav() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-x-0 top-[76px] z-40 bg-background/95 backdrop-blur-lg border-b border-border md:hidden"
+            className="safe-landing-menu fixed inset-x-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border md:hidden"
           >
             <div className="px-4 py-6 space-y-4">
               {navLinks.map((link) => (

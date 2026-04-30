@@ -49,7 +49,7 @@ export function Sidebar({
       {/* Logo */}
       <div
         className={cn(
-          "flex h-20 items-center gap-3 border-b border-sidebar-border",
+          "safe-sidebar-logo flex items-center gap-3 border-b border-sidebar-border",
           collapsed ? "justify-center px-2" : "px-4"
         )}
       >

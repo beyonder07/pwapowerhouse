@@ -9,7 +9,7 @@ export function HeroSection() {
   return (
     <section className="relative w-full overflow-hidden">
       {/* Hero Container */}
-      <div className="relative min-h-screen md:h-[100vh] flex items-center justify-center pt-20 md:pt-0">
+      <div className="relative flex min-h-[100dvh] items-center justify-center pt-20 md:pt-0">
         {/* Content Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/10 to-background/25" />
 
