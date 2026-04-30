@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="safe-area-page flex flex-col bg-background">
       {/* Header */}
       <header className="p-3 sm:p-4">
         <BrandLogo href="/" size="lg" />

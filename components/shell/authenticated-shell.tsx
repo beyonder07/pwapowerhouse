@@ -76,7 +76,7 @@ export function AuthenticatedShell({
 
   if (!user) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-background">
+      <div className="safe-area-page flex items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
     )

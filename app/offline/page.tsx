@@ -11,7 +11,7 @@ export default function OfflinePage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="safe-area-page flex flex-col bg-background">
       {/* Header */}
       <header className="p-4">
         <BrandLogo size="lg" />

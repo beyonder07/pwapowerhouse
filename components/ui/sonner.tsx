@@ -3,7 +3,7 @@
 import { useTheme } from 'next-themes'
 import { Toaster as Sonner, ToasterProps } from 'sonner'
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({ offset, ...props }: ToasterProps) => {
   const { theme = 'system' } = useTheme()
 
   return (
@@ -17,6 +17,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           '--normal-border': 'var(--border)',
         } as React.CSSProperties
       }
+      offset={offset ?? 'calc(1rem + var(--safe-area-inset-top))'}
       {...props}
     />
   )

@@ -69,7 +69,7 @@ export function AppShell({
         <main
           className={cn(
             "flex-1 overflow-y-auto overflow-x-hidden",
-            "pb-20 lg:pb-0" // Padding for mobile nav
+            "mobile-main-safe"
           )}
         >
           <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">

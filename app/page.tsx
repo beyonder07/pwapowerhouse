@@ -16,7 +16,7 @@ import {
 export default function LandingPage() {
   return (
     <LenisProvider>
-      <div className="relative min-h-screen overflow-x-hidden bg-background">
+      <div className="safe-bottom relative min-h-[100dvh] overflow-x-hidden bg-background">
         <div className="fixed inset-0 z-0 pointer-events-none">
           <video
             className="h-full w-full object-cover object-center"

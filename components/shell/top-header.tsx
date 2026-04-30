@@ -57,7 +57,7 @@ export function TopHeader({ role, userName, userAvatar, className }: TopHeaderPr
   return (
     <header
       className={cn(
-        "flex h-16 items-center justify-between gap-4 border-b border-border bg-card px-4 lg:px-6",
+        "safe-app-header flex items-center justify-between gap-4 border-b border-border bg-card px-4 lg:px-6",
         className
       )}
     >

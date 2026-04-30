@@ -33,6 +33,9 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent",
     title: "PowerHouse Gym",
   },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
   formatDetection: {
     telephone: true,
   },
@@ -48,8 +51,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#0f0f14" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f0f14" },
+    { media: "(prefers-color-scheme: light)", color: "#000000" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
   width: "device-width",
   initialScale: 1,

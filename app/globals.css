@@ -47,6 +47,11 @@
   --ph-navy-light: oklch(0.18 0.02 260);
   --ph-surface: oklch(0.15 0.01 260);
   --ph-surface-elevated: oklch(0.18 0.01 260);
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --landing-nav-height: 76px;
+  --app-header-height: 4rem;
+  --mobile-nav-height: 4rem;
 }
 
 .dark {
@@ -137,8 +142,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    min-height: 100%;
+    margin: 0;
+  }
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100dvh;
   }
   html {
     scroll-behavior: smooth;
@@ -146,12 +157,51 @@
 }
 
 /* PWA safe area handling */
-@supports (padding-top: env(safe-area-inset-top)) {
-  .safe-top {
-    padding-top: env(safe-area-inset-top);
-  }
-  .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+.safe-area-page {
+  min-height: 100dvh;
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+.safe-top {
+  padding-top: var(--safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+.safe-app-header {
+  min-height: calc(var(--app-header-height) + var(--safe-area-inset-top));
+  padding-top: var(--safe-area-inset-top);
+}
+
+.safe-sidebar-logo {
+  min-height: calc(5rem + var(--safe-area-inset-top));
+  padding-top: var(--safe-area-inset-top);
+}
+
+.safe-landing-nav {
+  padding-top: var(--safe-area-inset-top);
+}
+
+.safe-landing-menu {
+  top: calc(var(--landing-nav-height) + var(--safe-area-inset-top));
+}
+
+.mobile-main-safe {
+  padding-bottom: calc(
+    var(--mobile-nav-height) + 1rem + var(--safe-area-inset-bottom)
+  );
+}
+
+.toast-safe-top {
+  padding-top: calc(1rem + var(--safe-area-inset-top));
+}
+
+@media (min-width: 1024px) {
+  .mobile-main-safe {
+    padding-bottom: 0;
   }
 }
 
