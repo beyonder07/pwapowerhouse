@@ -21,23 +21,33 @@ export function LandingNav() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50)
+      const scroller = document.querySelector(".app-scroll")
+      setIsScrolled((scroller?.scrollTop ?? window.scrollY) > 50)
     }
+    const scroller = document.querySelector(".app-scroll")
+    scroller?.addEventListener("scroll", handleScroll, { passive: true })
     window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
+    handleScroll()
+
+    return () => {
+      scroller?.removeEventListener("scroll", handleScroll)
+      window.removeEventListener("scroll", handleScroll)
+    }
   }, [])
+
+  const scrollToSection = (href: string) => {
+    const target = document.getElementById(href.replace("#", ""))
+    target?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   return (
     <>
-      <motion.header
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
+      <header
         className={cn(
           "safe-landing-nav fixed top-0 left-0 right-0 z-50 transition-all duration-300",
           isScrolled
             ? "bg-background/95 backdrop-blur-md border-b border-slate-800"
-            : "bg-transparent"
+            : "bg-background/75 backdrop-blur-md"
         )}
       >
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -51,6 +61,10 @@ export function LandingNav() {
                 <a
                   key={link.href}
                   href={link.href}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    scrollToSection(link.href)
+                  }}
                   className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   {link.label}
@@ -63,7 +77,7 @@ export function LandingNav() {
               <Button variant="ghost" asChild className="text-accent hover:text-accent hover:bg-accent/10">
                 <Link href="#cta" onClick={(e) => {
                   e.preventDefault();
-                  document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' });
+                  scrollToSection("#cta")
                 }}>
                   Download App
                 </Link>
@@ -92,7 +106,7 @@ export function LandingNav() {
             </Button>
           </div>
         </nav>
-      </motion.header>
+      </header>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -109,7 +123,11 @@ export function LandingNav() {
                 <a
                   key={link.href}
                   href={link.href}
-                  onClick={() => setIsMobileMenuOpen(false)}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    setIsMobileMenuOpen(false)
+                    scrollToSection(link.href)
+                  }}
                   className="block text-lg font-medium text-foreground py-2"
                 >
                   {link.label}

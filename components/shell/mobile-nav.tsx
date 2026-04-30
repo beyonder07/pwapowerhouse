@@ -20,11 +20,11 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
   return (
     <nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-lg safe-bottom",
+        "bottom-nav-safe fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-background/95 backdrop-blur-lg",
         className
       )}
     >
-      <ul className="flex items-center justify-around h-16">
+      <ul className="flex h-[74px] items-center justify-around">
         {visibleItems.map((item) => {
           const isActive = pathname === item.href || 
             (item.href.split("/").length > 2 && pathname.startsWith(item.href))

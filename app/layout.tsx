@@ -77,7 +77,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-background">
-        {children}
+        <div id="root" className="app-root">
+          {children}
+        </div>
         <Toaster
           position="top-center"
           toastOptions={{

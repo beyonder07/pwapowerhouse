@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { AppShell } from "./app-shell"
+import { ProtectedHistoryGuard } from "./protected-history-guard"
 import type { NavItem, UserRole } from "./types"
 
 interface SessionUser {
@@ -83,19 +84,22 @@ export function AuthenticatedShell({
   }
 
   return (
-    <AppShell
-      role={role}
-      navItems={navItems}
-      footerItems={footerItems}
-      pendingCount={pendingCount}
-      user={{
-        name: displayNameFor(user),
-        email: user.email ?? "",
-        avatar: user.avatarUrl,
-        role: user.role,
-      }}
-    >
-      {children}
-    </AppShell>
+    <>
+      <ProtectedHistoryGuard />
+      <AppShell
+        role={role}
+        navItems={navItems}
+        footerItems={footerItems}
+        pendingCount={pendingCount}
+        user={{
+          name: displayNameFor(user),
+          email: user.email ?? "",
+          avatar: user.avatarUrl,
+          role: user.role,
+        }}
+      >
+        {children}
+      </AppShell>
+    </>
   )
 }

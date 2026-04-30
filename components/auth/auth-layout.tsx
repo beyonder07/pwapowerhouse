@@ -18,12 +18,12 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       </header>
 
       {/* Content */}
-      <main className="flex-1 flex items-center justify-center px-4 py-6 sm:py-8">
+      <main className="app-scroll flex-1 px-4 py-6 sm:py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="w-full max-w-md"
+          className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center"
         >
           <div className="text-center mb-6 sm:mb-8">
             <h1 className="text-xl sm:text-2xl font-bold text-foreground text-balance">{title}</h1>
