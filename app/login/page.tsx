@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
@@ -22,6 +22,32 @@ export default function LoginPage() {
     password: "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let mounted = true
+
+    async function redirectAuthenticatedUser() {
+      try {
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+          cache: "no-store",
+        })
+        const result = await response.json()
+
+        if (mounted && response.ok && result.success) {
+          router.replace(`/${result.data.user.role as UserRole}`)
+        }
+      } catch {
+        // Anonymous users should stay on the login page.
+      }
+    }
+
+    redirectAuthenticatedUser()
+
+    return () => {
+      mounted = false
+    }
+  }, [router])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -68,7 +94,7 @@ export default function LoginPage() {
       })
 
       setTimeout(() => {
-        router.push(`/${role}`)
+        router.replace(`/${role}`)
       }, 500)
     } catch (error) {
       toast.error("Unable to sign in", {

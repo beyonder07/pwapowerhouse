@@ -18,12 +18,12 @@ export default function OfflinePage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 flex items-center justify-center px-4">
+      <main className="app-scroll flex-1 px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="text-center max-w-md"
+          className="mx-auto flex min-h-full max-w-md flex-col justify-center text-center"
         >
           <motion.div
             initial={{ scale: 0.8 }}

@@ -44,7 +44,7 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-background">
+    <div className="app-screen flex bg-background">
       {/* Desktop Sidebar */}
       <Sidebar
         role={role}
@@ -68,7 +68,7 @@ export function AppShell({
         {/* Content */}
         <main
           className={cn(
-            "flex-1 overflow-y-auto overflow-x-hidden",
+            "main-content flex-1",
             "mobile-main-safe"
           )}
         >
