@@ -187,6 +187,34 @@
   }
 }
 
+/* Premium Custom Scrollbar */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.28 0.01 260);
+    border: 3px solid var(--background);
+    border-radius: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.4 0.01 260);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.28 0.01 260) var(--background);
+  }
+}
+
 @supports (-webkit-touch-callout: none) {
   @media (hover: none) and (pointer: coarse) {
     body {
