@@ -3,17 +3,6 @@
 import { useEffect, useRef } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
-function isStandalonePwa() {
-  const navigatorWithStandalone = navigator as Navigator & {
-    standalone?: boolean
-  }
-
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    navigatorWithStandalone.standalone === true
-  )
-}
-
 export function ProtectedHistoryGuard() {
   const router = useRouter()
   const pathname = usePathname()
@@ -24,8 +13,6 @@ export function ProtectedHistoryGuard() {
   }, [pathname])
 
   useEffect(() => {
-    if (!isStandalonePwa()) return
-
     const pushGuardState = () => {
       const currentPath = currentPathRef.current
 
