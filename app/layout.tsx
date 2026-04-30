@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
+import { AppVersionManager } from "@/components/app-version-manager"
 import { PwaScrollBoundaryGuard } from "@/components/pwa-scroll-boundary-guard"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
@@ -79,6 +80,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-background">
         <div id="root" className="app-root">
+          <AppVersionManager />
           <PwaScrollBoundaryGuard />
           {children}
         </div>
@@ -93,24 +95,6 @@ export default function RootLayout({
           }}
         />
         <Analytics />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(
-                    function(registration) {
-                      console.log('Service Worker registration successful with scope: ', registration.scope);
-                    },
-                    function(err) {
-                      console.log('Service Worker registration failed: ', err);
-                    }
-                  );
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   )
