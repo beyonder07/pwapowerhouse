@@ -22,7 +22,8 @@ export function HeroSection() {
             className="space-y-6 md:space-y-8"
           >
             <h1 className="text-3xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight text-balance">
-              Strength isn&rsquo;t given. It&rsquo;s forged.
+              <span className="block">Strength isn&rsquo;t given,</span>
+              <span className="block">It&rsquo;s forged.</span>
             </h1>
 
             <motion.p
