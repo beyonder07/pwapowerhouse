@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
+import { PwaScrollBoundaryGuard } from "@/components/pwa-scroll-boundary-guard"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
@@ -78,6 +79,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-background">
         <div id="root" className="app-root">
+          <PwaScrollBoundaryGuard />
           {children}
         </div>
         <Toaster

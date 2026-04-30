@@ -44,7 +44,7 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="app-screen flex bg-background">
+    <div className="app-shell bg-background">
       {/* Desktop Sidebar */}
       <Sidebar
         role={role}

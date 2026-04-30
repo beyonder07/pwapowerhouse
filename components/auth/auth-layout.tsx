@@ -11,14 +11,14 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
-    <div className="safe-area-page flex flex-col bg-background">
+    <div className="app-shell safe-area-page bg-background">
       {/* Header */}
       <header className="p-3 sm:p-4">
         <BrandLogo href="/" size="lg" />
       </header>
 
       {/* Content */}
-      <main className="app-scroll flex-1 px-4 py-6 sm:py-8">
+      <main className="page-scroll px-4 py-6 sm:py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
