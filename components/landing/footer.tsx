@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Phone, Mail, MapPin, Instagram, Facebook, Youtube } from "lucide-react"
+import { Phone, Mail, MapPin, Instagram, Facebook } from "lucide-react"
 import { BrandLogo } from "@/components/brand-logo"
 
 const footerLinks = {
@@ -33,25 +33,22 @@ export function Footer() {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="#"
+                href="https://www.instagram.com/powerhousegym_bdn/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
                 aria-label="Instagram"
               >
                 <Instagram className="h-5 w-5 text-slate-400 hover:text-accent" />
               </a>
               <a
-                href="#"
+                href="https://www.facebook.com/Powerhousegym.civillines/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
                 aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5 text-slate-400 hover:text-accent" />
-              </a>
-              <a
-                href="#"
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
-                aria-label="YouTube"
-              >
-                <Youtube className="h-5 w-5 text-slate-400 hover:text-accent" />
               </a>
             </div>
           </div>
