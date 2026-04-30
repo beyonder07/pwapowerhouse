@@ -215,7 +215,6 @@
 
 .app-shell {
   display: flex;
-  flex-direction: column;
 }
 
 .landing-page {

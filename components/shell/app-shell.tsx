@@ -44,7 +44,7 @@ export function AppShell({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
-    <div className="app-shell lg:flex-row bg-background">
+    <div className="app-shell flex-col lg:flex-row bg-background">
       {/* Desktop Sidebar */}
       <Sidebar
         role={role}
