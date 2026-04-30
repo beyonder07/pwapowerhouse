@@ -14,5 +14,6 @@ next.user-config.*
 node_modules
 .next/
 tsconfig.tsbuildinfo
+public/version.json
 .DS_Store
 *.log
