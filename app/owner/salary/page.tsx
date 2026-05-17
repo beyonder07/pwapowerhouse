@@ -420,10 +420,10 @@ export default function OwnerSalaryPage() {
             {salaries.map((salary) => (
               <SurfaceCard key={salary.id}>
                 {/* ── Main row ── */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   {/* Avatar + name */}
-                  <div className="flex min-w-0 flex-1 gap-4">
-                    <Avatar className="h-12 w-12 shrink-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <Avatar className="h-10 w-10 shrink-0">
                       <AvatarImage src={salary.avatarUrl ?? undefined} alt={salary.trainerName} />
                       <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
                         {initials(salary.trainerName)}
@@ -431,11 +431,11 @@ export default function OwnerSalaryPage() {
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="mb-1 flex flex-wrap items-center gap-2">
-                        <h3 className="font-semibold text-foreground">{salary.trainerName}</h3>
+                        <h3 className="font-bold text-foreground">{salary.trainerName}</h3>
                         <StatusPill status={salaryTone(salary.status)} label={salary.status} size="sm" />
                       </div>
                       {/* Salary breakdown */}
-                      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                         <span>
                           Base:{" "}
                           <span className={salary.baseSalary === 0 ? "text-amber-500 font-bold" : "text-foreground font-semibold"}>
@@ -453,12 +453,12 @@ export default function OwnerSalaryPage() {
                     </div>
                   </div>
 
-                  {/* Right side: total + actions */}
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    <p className={`text-lg font-bold ${salary.total === 0 ? "text-amber-500" : "text-foreground"}`}>
+                  {/* Bottom on mobile, right on desktop: total + actions */}
+                  <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
+                    <p className={`text-base font-bold sm:text-lg ${salary.total === 0 ? "text-amber-500" : "text-foreground"}`}>
                       {salary.total === 0 ? "Set salary →" : formatCurrency(salary.total)}
                     </p>
-                    <div className="flex flex-wrap justify-end gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {/* Edit salary/bonus */}
                       <Button
                         size="sm"
@@ -485,25 +485,15 @@ export default function OwnerSalaryPage() {
                         </Button>
                       )}
                       {salary.status === "pending" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 gap-1.5 text-xs font-bold"
-                          onClick={() => updateStatus(salary.id, "processing")}
-                          disabled={!!updatingId}
-                        >
+                        <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs font-bold"
+                          onClick={() => updateStatus(salary.id, "processing")} disabled={!!updatingId}>
                           <Clock className="h-3.5 w-3.5" />
                           Processing
                         </Button>
                       )}
                       {salary.status === "paid" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 gap-1.5 text-xs font-bold text-muted-foreground"
-                          onClick={() => updateStatus(salary.id, "pending")}
-                          disabled={!!updatingId}
-                        >
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs font-bold text-muted-foreground"
+                          onClick={() => updateStatus(salary.id, "pending")} disabled={!!updatingId}>
                           <RotateCcw className="h-3.5 w-3.5" />
                           Reset
                         </Button>

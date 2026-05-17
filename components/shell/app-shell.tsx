@@ -45,7 +45,7 @@ export function AppShell({
   const lastScrollY = useRef(0)
   const ticking = useRef(false)
 
-  // Auto-hide nav on scroll-down, reveal on scroll-up (rAF-throttled)
+  // Auto-hide nav: hide on scroll-down past 100px, reveal on any upward scroll
   useEffect(() => {
     const el = mainRef.current
     if (!el) return
@@ -57,10 +57,11 @@ export function AppShell({
         const currentY = el.scrollTop
         const delta = currentY - lastScrollY.current
 
-        // Only react to meaningful scrolls (> 4px) to avoid jitter
-        if (delta > 4 && currentY > 60) {
+        // Need to be past 100px before hiding kicks in
+        if (currentY > 100 && delta > 10) {
           setNavHidden(true)
-        } else if (delta < -4) {
+        } else if (delta < -8 || currentY <= 60) {
+          // Reveal on upward scroll OR when near top
           setNavHidden(false)
         }
 
