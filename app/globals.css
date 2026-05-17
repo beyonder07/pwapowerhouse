@@ -54,7 +54,7 @@
     var(--landing-nav-height) + var(--safe-area-inset-top)
   );
   --app-header-height: 3.5rem;
-  --mobile-nav-height: 48px;
+  --mobile-nav-height: 64px;
 }
 
 .dark {
@@ -318,8 +318,16 @@
   top: calc(var(--landing-nav-height) + var(--safe-area-inset-top));
 }
 
+/* Mobile main scroll area — must clear the fixed bottom nav fully */
 .mobile-main-safe {
-  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  /* 64px nav + 16px breathing room + iPhone safe area */
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .mobile-main-safe {
+    padding-bottom: 0;
+  }
 }
 
 .bottom-nav-safe {
@@ -347,12 +355,6 @@
 .card {
   max-width: 100%;
   overflow-x: hidden;
-}
-
-@media (min-width: 1024px) {
-  .mobile-main-safe {
-    padding-bottom: 0;
-}
 }
 
 /* Smooth scroll via Lenis */

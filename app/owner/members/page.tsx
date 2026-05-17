@@ -247,65 +247,70 @@ export default function OwnerMembersPage() {
   const hasFilters = search.trim() || status !== "all"
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
-        <PageIntro title="Members" description="All gym members — click any card to see full profile" />
+    <div className="max-w-6xl">
+      <PageIntro title="Members" description="All gym members — tap any card to see full profile" />
 
-        <SurfaceCard className="mb-6">
-          <SearchToolbar value={search} onChange={(v) => { setSearch(v); setCurrentPage(1) }} placeholder="Search by name…"
-            filters={[{ value: status, onChange: (v) => { setStatus(v); setCurrentPage(1) }, placeholder: "All Status",
-              options: [{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "expiring", label: "Expiring" }, { value: "expired", label: "Expired" }] }]} />
-        </SurfaceCard>
+      <SurfaceCard className="mb-6">
+        <SearchToolbar value={search} onChange={(v) => { setSearch(v); setCurrentPage(1) }} placeholder="Search by name…"
+          filters={[{ value: status, onChange: (v) => { setStatus(v); setCurrentPage(1) }, placeholder: "All Status",
+            options: [{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "expiring", label: "Expiring" }, { value: "expired", label: "Expired" }] }]} />
+      </SurfaceCard>
 
-        {!isLoading && <p className="mb-4 text-sm text-muted-foreground">Showing {members.length} of {total} member{total !== 1 ? "s" : ""}</p>}
+      {!isLoading && <p className="mb-3 text-xs text-muted-foreground">Showing {members.length} of {total} member{total !== 1 ? "s" : ""}</p>}
 
-        <div className="space-y-3">
-          {isLoading ? Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl border border-border bg-card" />)
-          : members.length === 0 ? (
-            <EmptyState icon={hasFilters ? SearchX : Users} title={hasFilters ? "No members found" : "No members yet"}
+      <div className="space-y-2">
+        {isLoading
+          ? Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-xl border border-border bg-card" />)
+          : members.length === 0
+          ? <EmptyState icon={hasFilters ? SearchX : Users} title={hasFilters ? "No members found" : "No members yet"}
               description={hasFilters ? "Try adjusting filters." : "Members appear here once signed up."} />
-          ) : members.map(m => (
+          : members.map(m => (
             <button key={m.id} onClick={() => setSelectedId(m.id)} className="w-full text-left">
               <SurfaceCard interactive className="hover:border-primary/40">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <Avatar className="h-10 w-10 shrink-0">
-                      <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials(m.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-0.5 flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-foreground">{m.name}</span>
-                        <StatusPill status={membershipTone(m.membershipStatus)} label={m.membershipStatus === "expiring" ? "Expiring" : m.membershipStatus} size="sm" />
-                      </div>
-                      <p className="truncate text-xs text-muted-foreground">{m.email ?? "No email"}</p>
+                {/* Mobile: stack vertically. Desktop: single row */}
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <Avatar className="h-10 w-10 shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials(m.name)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    {/* Row 1: name + status badge */}
+                    <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                      <span className="truncate font-semibold text-foreground text-sm">{m.name}</span>
+                      <StatusPill status={membershipTone(m.membershipStatus)} label={m.membershipStatus === "expiring" ? "Expiring" : m.membershipStatus} size="sm" />
+                    </div>
+                    {/* Row 2: email */}
+                    <p className="truncate text-xs text-muted-foreground">{m.email ?? "No email"}</p>
+                    {/* Row 3: last check-in + days left */}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {m.lastCheckInRelative === "No attendance" ? "No check-ins yet" : m.lastCheckInRelative}
+                      </p>
+                      {(m.membershipStatus === "active" || m.membershipStatus === "expiring") && (
+                        <p className={`text-xs font-bold ${m.membershipStatus === "expiring" ? "text-amber-500" : "text-emerald-500"}`}>
+                          {m.daysRemaining}d left
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    {m.membershipStatus === "active" || m.membershipStatus === "expiring" ? (
-                      <p className={`text-sm font-bold ${m.membershipStatus === "expiring" ? "text-amber-500" : "text-foreground"}`}>
-                        {m.daysRemaining}d left
-                      </p>
-                    ) : null}
-                    <p className="text-xs text-muted-foreground">
-                      {m.lastCheckInRelative === "No attendance"
-                        ? "No check-ins yet"
-                        : m.lastCheckInRelative}
-                    </p>
-                  </div>
+                  {/* Chevron hint */}
+                  <span className="shrink-0 text-muted-foreground/40 text-sm">›</span>
                 </div>
               </SurfaceCard>
             </button>
-          ))}
-        </div>
-
-        {totalPages > 1 && (
-          <div className="mt-6 flex justify-center gap-2">
-            <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
-            <span className="flex items-center px-3 text-sm text-muted-foreground">{currentPage} / {totalPages}</span>
-            <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
-          </div>
-        )}
+          ))
+        }
       </div>
+
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center gap-2">
+          <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>Previous</Button>
+          <span className="flex items-center px-3 text-sm text-muted-foreground">{currentPage} / {totalPages}</span>
+          <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>Next</Button>
+        </div>
+      )}
+
+      {/* Bottom spacer — ensures last card clears the fixed nav on all phones */}
+      <div className="h-20 lg:hidden" aria-hidden="true" />
 
       {selectedId && <MemberDrawer memberId={selectedId} onClose={() => setSelectedId(null)} />}
     </div>

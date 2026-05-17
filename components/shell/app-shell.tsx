@@ -98,8 +98,10 @@ export function AppShell({
 
         {/* Content — scroll container lives here */}
         <main ref={mainRef} className={cn("main-content flex-1", "mobile-main-safe")}>
-          <div className="mx-auto h-full max-w-7xl px-3 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+          <div className="mx-auto max-w-7xl px-3 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {children}
+            {/* Extra bottom spacer on mobile so last card never hides under nav */}
+            <div className="h-6 lg:hidden" aria-hidden="true" />
           </div>
         </main>
       </div>
