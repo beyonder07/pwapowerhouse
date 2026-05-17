@@ -807,9 +807,10 @@ export class AnalyticsService {
   }
 
   private async getAttendanceFromTables(query: AnalyticsDateRangeQuery) {
+    const admin = createSupabaseServiceRoleClient()
     const { from, to } = rangeOrDefault(query)
     const { data, error } = await withGymFilter(
-      this.ctx.supabase
+      admin
         .from("attendance")
         .select("date")
         .gte("date", from)
@@ -944,10 +945,11 @@ export class AnalyticsService {
   }
 
   private async getInactiveMembersFromTables(query: InactiveMembersQuery) {
+    const admin = createSupabaseServiceRoleClient()
     const cutoff = daysAgo(query.days)
     const [clientsResult, attendanceResult] = await Promise.all([
       withGymFilter(
-        this.ctx.supabase
+        admin
           .from("users")
           .select("id,name,email")
           .eq("role", "client")
@@ -955,7 +957,7 @@ export class AnalyticsService {
         query.branchId
       ),
       withGymFilter(
-        this.ctx.supabase.from("attendance").select("user_id,date"),
+        admin.from("attendance").select("user_id,date"),
         query.branchId
       ),
     ])
@@ -1016,6 +1018,7 @@ export class AnalyticsService {
   private async getDashboardMetricsFromTables(
     gymId?: string | null
   ): Promise<DashboardMetrics> {
+    const admin = createSupabaseServiceRoleClient()
     const weekStart = daysAgo(6)
     const monthStart = currentMonthStart()
     const today = todayDate()
@@ -1031,50 +1034,25 @@ export class AnalyticsService {
       pendingPaymentsResult,
       requestsResult,
     ] = await Promise.all([
+      withGymFilter(admin.from("users").select("id").eq("role", "client"), gymId),
+      withGymFilter(admin.from("memberships").select("user_id").eq("status", "active"), gymId),
+      withGymFilter(admin.from("users").select("id").eq("role", "trainer"), gymId),
       withGymFilter(
-        this.ctx.supabase.from("users").select("id").eq("role", "client"),
+        admin.from("attendance").select("user_id,date").gte("date", weekStart).lte("date", today),
         gymId
       ),
       withGymFilter(
-        this.ctx.supabase
-          .from("memberships")
-          .select("user_id")
-          .eq("status", "active"),
+        admin.from("payments").select("amount,status,created_at")
+          .in("status", ["paid", "approved"]).gte("created_at", `${weekStart}T00:00:00.000Z`),
         gymId
       ),
       withGymFilter(
-        this.ctx.supabase.from("users").select("id").eq("role", "trainer"),
+        admin.from("payments").select("amount,status,created_at")
+          .in("status", ["paid", "approved"]).gte("created_at", `${monthStart}T00:00:00.000Z`),
         gymId
       ),
-      withGymFilter(
-        this.ctx.supabase
-          .from("attendance")
-          .select("user_id,date")
-          .gte("date", weekStart)
-          .lte("date", today),
-        gymId
-      ),
-      withGymFilter(
-        this.ctx.supabase
-          .from("payments")
-          .select("amount,status,created_at")
-          .in("status", ["paid", "approved"])
-          .gte("created_at", `${weekStart}T00:00:00.000Z`),
-        gymId
-      ),
-      withGymFilter(
-        this.ctx.supabase
-          .from("payments")
-          .select("amount,status,created_at")
-          .in("status", ["paid", "approved"])
-          .gte("created_at", `${monthStart}T00:00:00.000Z`),
-        gymId
-      ),
-      withGymFilter(
-        this.ctx.supabase.from("payments").select("amount").eq("status", "pending"),
-        gymId
-      ),
-      this.ctx.supabase.from("requests").select("id").eq("status", "pending"),
+      withGymFilter(admin.from("payments").select("amount").eq("status", "pending"), gymId),
+      admin.from("requests").select("id").eq("status", "pending"),
     ])
 
     if (clientsResult.error) throw clientsResult.error
@@ -1126,8 +1104,9 @@ export class AnalyticsService {
   }
 
   private async getRecentPaymentsFromTables(limit: number, gymId?: string | null) {
+    const admin = createSupabaseServiceRoleClient()
     const nestedResult = await withGymFilter(
-      this.ctx.supabase
+      admin
         .from("payments")
         .select("id,user_id,member_id,amount,status,created_at,users(name,email)")
         .order("created_at", { ascending: false })
@@ -1140,14 +1119,13 @@ export class AnalyticsService {
 
     if (error) {
       const plainResult = await withGymFilter(
-        this.ctx.supabase
+        admin
           .from("payments")
           .select("id,user_id,member_id,amount,status,created_at")
           .order("created_at", { ascending: false })
           .limit(limit),
         gymId
       )
-
       data = plainResult.data as unknown[] | null
       error = plainResult.error
     }
@@ -1162,7 +1140,6 @@ export class AnalyticsService {
         stringField(user, "name") ??
         stringField(user, "email") ??
         paymentMemberName(payment)
-
       return {
         id: String(payment.id),
         memberId: String(payment.user_id ?? payment.member_id),
@@ -1176,56 +1153,55 @@ export class AnalyticsService {
   }
 
   private async getPendingRequestsFromTables(limit: number) {
-    const { data, error } = await this.ctx.supabase
+    const admin = createSupabaseServiceRoleClient()
+    const { data, error } = await admin
       .from("requests")
       .select("id,type,data,created_at")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(limit)
-
     if (error) throw error
-
     return ((data ?? []) as LegacyRequestRow[]).map((request) => ({
-      id: request.id,
-      name: requestDisplayName(request),
-      type: request.type,
-      createdAt: request.created_at,
+      id: request.id, name: requestDisplayName(request),
+      type: request.type, createdAt: request.created_at,
     }))
   }
 
   private async getRecentAttendanceFromTables(query: RecentAttendanceQuery) {
-    const nestedResult = await this.ctx.supabase
+    const admin = createSupabaseServiceRoleClient()
+    const nestedResult = await admin
       .from("attendance")
-      .select("id,member_id,date,check_in_time,distance_meters,members(users(name,email))")
+      .select("id,user_id,date,check_in_time,distance_meters,users(name,email)")
+      .order("date", { ascending: false })
       .order("check_in_time", { ascending: false })
+      .limit(query.limit + query.offset)
 
     let data = nestedResult.data as unknown[] | null
     let error = nestedResult.error
 
     if (error) {
-      const plainResult = await this.ctx.supabase
+      const plainResult = await admin
         .from("attendance")
-        .select("id,member_id,date,check_in_time")
-        .order("check_in_time", { ascending: false })
-
+        .select("id,user_id,date,check_in_time")
+        .order("date", { ascending: false })
+        .limit(query.limit + query.offset)
       data = plainResult.data as unknown[] | null
       error = plainResult.error
     }
 
     if (error) throw error
 
-    const normalized = ((data ?? []) as LegacyAttendanceRow[]).map((row) => {
-      const member = firstRecord(row.members)
-      const user = firstRecord(member?.users)
+    type AttRow = { id?: string|number; user_id?: string; date: string; check_in_time?: string; distance_meters?: number|string|null; users?: unknown }
+    const normalized = ((data ?? []) as AttRow[]).map((row) => {
+      const user = firstRecord(row.users)
       const memberName =
         stringField(user, "name") ??
         stringField(user, "full_name") ??
         stringField(user, "email") ??
-        `Member #${row.member_id}`
-
+        `Member #${row.user_id}`
       return {
-        id: String(row.id ?? `${row.member_id}-${row.date}`),
-        memberId: String(row.member_id),
+        id: String(row.id ?? `${row.user_id}-${row.date}`),
+        memberId: String(row.user_id ?? ""),
         memberName,
         branchName: "PowerHouse Gym",
         attendanceDate: row.date,
@@ -1242,10 +1218,7 @@ export class AnalyticsService {
     return {
       count: filtered.length,
       checkIns: filtered.slice(query.offset, query.offset + query.limit),
-      pagination: {
-        limit: query.limit,
-        offset: query.offset,
-      },
+      pagination: { limit: query.limit, offset: query.offset },
     }
   }
 }
