@@ -54,7 +54,7 @@
     var(--landing-nav-height) + var(--safe-area-inset-top)
   );
   --app-header-height: 3.5rem;
-  --mobile-nav-height: 56px;
+  --mobile-nav-height: 48px;
 }
 
 .dark {
@@ -319,7 +319,7 @@
 }
 
 .mobile-main-safe {
-  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
 }
 
 .bottom-nav-safe {

@@ -10,13 +10,14 @@ import { ChevronUp } from "lucide-react"
 interface MobileNavProps {
   navItems: NavItem[]
   pendingCount?: number
+  hidden?: boolean
   className?: string
 }
 
-// NAV_H must match --mobile-nav-height in globals.css
-const NAV_H = 56
+// Must match --mobile-nav-height in globals.css
+const NAV_H = 48
 
-export function MobileNav({ navItems, pendingCount, className }: MobileNavProps) {
+export function MobileNav({ navItems, pendingCount, hidden = false, className }: MobileNavProps) {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(false)
 
@@ -24,19 +25,20 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
   const overflowItems = navItems.slice(4)
   const hasOverflow = overflowItems.length > 0
 
+  // Always collapse tray when nav hides
+  if (hidden && expanded) setExpanded(false)
+
   return (
     <>
-      {/* ── Overflow tray ─────────────────────────────────────────────── */}
-      {/* Sits immediately ABOVE the nav bar — never overlaps it */}
+      {/* ── Overflow tray — sits flush above nav bar ───────────────── */}
       {hasOverflow && expanded && (
         <>
-          {/* Backdrop — full screen dimmer, closes tray on tap */}
+          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={() => setExpanded(false)}
           />
-
-          {/* Tray panel — anchored above the nav bar using bottom = NAV_H + safe-area */}
+          {/* Tray panel — anchored above nav */}
           <div
             className="fixed left-0 right-0 z-40 border-t border-white/10 bg-background/98 backdrop-blur-xl"
             style={{
@@ -57,7 +59,7 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
                     key={item.href}
                     href={item.href}
                     onClick={() => setExpanded(false)}
-                    className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-3 transition-colors active:bg-white/10"
                   >
                     <div className="relative">
                       <item.icon
@@ -88,14 +90,24 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
         </>
       )}
 
-      {/* ── Bottom nav bar ────────────────────────────────────────────── */}
+      {/* ── Bottom nav bar ────────────────────────────────────────── */}
       <nav
         className={cn(
-          "bottom-nav-safe fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-background/95 backdrop-blur-lg",
+          // Safe area padding (handles notch/home indicator)
+          "bottom-nav-safe",
+          // Positioning + styling
+          "fixed bottom-0 left-0 right-0 z-50",
+          "border-t border-white/10 bg-background/95 backdrop-blur-lg",
+          // Smooth slide-down hide
+          "transition-transform duration-300 ease-in-out",
+          hidden ? "translate-y-full" : "translate-y-0",
           className
         )}
       >
-        <ul className="flex h-[56px] items-stretch">
+        <ul
+          className="flex items-stretch"
+          style={{ height: `${NAV_H}px` }}
+        >
           {primaryItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -107,25 +119,25 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
               <li key={item.href} className="flex-1">
                 <Link
                   href={item.href}
-                  className="flex h-full flex-col items-center justify-center gap-0.5 tap-target"
+                  className="flex h-full flex-col items-center justify-center gap-[3px]"
                 >
                   <div className="relative">
                     <item.icon
                       className={cn(
-                        "h-5 w-5",
-                        isActive ? "text-primary" : "text-muted-foreground"
+                        "h-[18px] w-[18px]",
+                        isActive ? "text-primary" : "text-muted-foreground/70"
                       )}
                     />
                     {showBadge && (
-                      <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1">
+                      <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-semibold px-0.5">
                         {pendingCount}
                       </span>
                     )}
                   </div>
                   <span
                     className={cn(
-                      "text-[10px] font-medium leading-none",
-                      isActive ? "text-primary" : "text-muted-foreground"
+                      "text-[9px] font-medium leading-none",
+                      isActive ? "text-primary" : "text-muted-foreground/70"
                     )}
                   >
                     {item.label}
@@ -140,26 +152,30 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
             <li className="flex-1">
               <button
                 onClick={() => setExpanded((v) => !v)}
-                className={cn(
-                  "flex h-full w-full flex-col items-center justify-center gap-0.5 tap-target transition-colors",
-                  expanded ? "text-primary" : "text-muted-foreground"
-                )}
+                className="flex h-full w-full flex-col items-center justify-center gap-[3px]"
               >
                 <div className="relative">
                   <ChevronUp
                     className={cn(
-                      "h-5 w-5 transition-transform duration-200",
-                      expanded ? "rotate-180 text-primary" : ""
+                      "h-[18px] w-[18px] transition-transform duration-200",
+                      expanded ? "rotate-180 text-primary" : "text-muted-foreground/70"
                     )}
                   />
                   {!expanded &&
                     overflowItems.some(
                       (i) => i.label === "Requests" && pendingCount && pendingCount > 0
                     ) && (
-                      <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                      <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary" />
                     )}
                 </div>
-                <span className="text-[10px] font-medium leading-none">More</span>
+                <span
+                  className={cn(
+                    "text-[9px] font-medium leading-none",
+                    expanded ? "text-primary" : "text-muted-foreground/70"
+                  )}
+                >
+                  More
+                </span>
               </button>
             </li>
           )}
