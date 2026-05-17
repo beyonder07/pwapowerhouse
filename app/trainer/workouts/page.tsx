@@ -437,235 +437,230 @@ export default function TrainerWorkoutsPage() {
         </div>
       )}
 
+      {/* ── Workout Plan Dialog ─────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {form.id ? "Edit Workout Plan" : "Create Workout Plan"}
-            </DialogTitle>
-            <DialogDescription>
-              Add day-wise exercises with sets, reps, rest, and coaching notes.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          className={[
+            // Full width on mobile with 8px gutters, capped on desktop
+            "w-[calc(100vw-16px)] max-w-2xl",
+            // Height: almost full screen on mobile
+            "max-h-[88dvh]",
+            // Flex column so header + footer can be sticky
+            "flex flex-col",
+            // Remove default padding — we'll control it per-section
+            "gap-0 p-0",
+            "overflow-hidden",
+          ].join(" ")}
+        >
+          {/* ── Sticky header ── */}
+          <div className="shrink-0 border-b border-border px-4 py-4 sm:px-6">
+            <DialogHeader>
+              <DialogTitle className="text-base sm:text-lg">
+                {form.id ? "Edit Workout Plan" : "Create Workout Plan"}
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Add day-wise exercises with sets, reps, rest, and coaching notes.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Member</Label>
-                <Select
-                  value={form.memberId}
-                  onValueChange={(value) =>
-                    setForm((current) => ({ ...current, memberId: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select member" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {members.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(value: "active" | "pending" | "archived") =>
-                    setForm((current) => ({ ...current, status: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="pending">Needs Update</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Plan title</Label>
-              <Input
-                value={form.title}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, title: event.target.value }))
-                }
-                placeholder="Example: Beginner Strength Split"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                value={form.notes}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, notes: event.target.value }))
-                }
-                placeholder="Add coaching cues, injury notes, or progression goals"
-              />
-            </div>
-
+          {/* ── Scrollable body ── */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
             <div className="space-y-4">
-              {form.split.map((day, dayIndex) => (
-                <div
-                  key={dayIndex}
-                  className="rounded-lg border border-border bg-card p-3"
-                >
-                  <div className="mb-3 flex items-center gap-2">
-                    <Input
-                      value={day.day}
-                      onChange={(event) => updateDay(dayIndex, event.target.value)}
-                      className="font-medium"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeDay(dayIndex)}
-                      disabled={form.split.length === 1}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Remove day</span>
-                    </Button>
-                  </div>
 
-                  <div className="space-y-3">
-                    {day.exercises.map((exercise, exerciseIndex) => (
-                      <div
-                        key={exerciseIndex}
-                        className="rounded-lg border border-border bg-background p-3"
+              {/* Member + Status — stack on mobile, side by side on sm+ */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Member</Label>
+                  <Select
+                    value={form.memberId}
+                    onValueChange={(value) => setForm((c) => ({ ...c, memberId: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {members.map((member) => (
+                        <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</Label>
+                  <Select
+                    value={form.status}
+                    onValueChange={(value: "active" | "pending" | "archived") =>
+                      setForm((c) => ({ ...c, status: value }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="pending">Needs Update</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Plan title */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Plan Title</Label>
+                <Input
+                  value={form.title}
+                  onChange={(e) => setForm((c) => ({ ...c, title: e.target.value }))}
+                  placeholder="Example: Beginner Strength Split"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notes</Label>
+                <Textarea
+                  value={form.notes}
+                  onChange={(e) => setForm((c) => ({ ...c, notes: e.target.value }))}
+                  placeholder="Add coaching cues, injury notes, or progression goals"
+                  className="w-full resize-none"
+                  rows={2}
+                />
+              </div>
+
+              {/* Day cards */}
+              <div className="space-y-3">
+                {form.split.map((day, dayIndex) => (
+                  <div key={dayIndex} className="rounded-xl border border-border bg-card overflow-hidden">
+                    {/* Day header */}
+                    <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-3 py-2">
+                      <Input
+                        value={day.day}
+                        onChange={(e) => updateDay(dayIndex, e.target.value)}
+                        className="h-8 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold focus-visible:ring-0"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeDay(dayIndex)}
+                        disabled={form.split.length === 1}
                       >
-                        <div className="grid gap-3 sm:grid-cols-[1fr_80px_100px_120px_auto]">
-                          <div className="space-y-1">
-                            <Label>Exercise</Label>
-                            <Input
-                              value={exercise.name}
-                              onChange={(event) =>
-                                updateExercise(
-                                  dayIndex,
-                                  exerciseIndex,
-                                  "name",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="Exercise name"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Sets</Label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={exercise.sets}
-                              onChange={(event) =>
-                                updateExercise(
-                                  dayIndex,
-                                  exerciseIndex,
-                                  "sets",
-                                  Number(event.target.value)
-                                )
-                              }
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Reps</Label>
-                            <Input
-                              value={exercise.reps}
-                              onChange={(event) =>
-                                updateExercise(
-                                  dayIndex,
-                                  exerciseIndex,
-                                  "reps",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="10"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Rest</Label>
-                            <Input
-                              value={exercise.restDuration}
-                              onChange={(event) =>
-                                updateExercise(
-                                  dayIndex,
-                                  exerciseIndex,
-                                  "restDuration",
-                                  event.target.value
-                                )
-                              }
-                              placeholder="60 sec"
-                            />
-                          </div>
-                          <div className="flex items-end">
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span className="sr-only">Remove day</span>
+                      </Button>
+                    </div>
+
+                    {/* Exercises */}
+                    <div className="space-y-2 p-3">
+                      {day.exercises.map((exercise, exerciseIndex) => (
+                        <div
+                          key={exerciseIndex}
+                          className="rounded-lg border border-border bg-background p-3 space-y-2"
+                        >
+                          {/* Exercise name + delete */}
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Exercise</Label>
+                              <Input
+                                value={exercise.name}
+                                onChange={(e) => updateExercise(dayIndex, exerciseIndex, "name", e.target.value)}
+                                placeholder="Exercise name"
+                                className="h-8 w-full text-sm"
+                              />
+                            </div>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
+                              className="mt-5 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                               onClick={() => removeExercise(dayIndex, exerciseIndex)}
                               disabled={day.exercises.length === 1}
                             >
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remove exercise</span>
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span className="sr-only">Remove</span>
                             </Button>
                           </div>
+
+                          {/* Sets / Reps / Rest — 3 compact columns always */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sets</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={exercise.sets}
+                                onChange={(e) => updateExercise(dayIndex, exerciseIndex, "sets", Number(e.target.value))}
+                                className="h-8 w-full text-center text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Reps</Label>
+                              <Input
+                                value={exercise.reps}
+                                onChange={(e) => updateExercise(dayIndex, exerciseIndex, "reps", e.target.value)}
+                                placeholder="10"
+                                className="h-8 w-full text-center text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rest</Label>
+                              <Input
+                                value={exercise.restDuration}
+                                onChange={(e) => updateExercise(dayIndex, exerciseIndex, "restDuration", e.target.value)}
+                                placeholder="60s"
+                                className="h-8 w-full text-center text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Notes</Label>
+                            <Input
+                              value={exercise.notes}
+                              onChange={(e) => updateExercise(dayIndex, exerciseIndex, "notes", e.target.value)}
+                              placeholder="Tempo, form cues, progression"
+                              className="h-8 w-full text-sm"
+                            />
+                          </div>
                         </div>
-                        <div className="mt-3 space-y-1">
-                          <Label>Exercise notes</Label>
-                          <Input
-                            value={exercise.notes}
-                            onChange={(event) =>
-                              updateExercise(
-                                dayIndex,
-                                exerciseIndex,
-                                "notes",
-                                event.target.value
-                              )
-                            }
-                            placeholder="Tempo, form cues, progression"
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-1 w-full text-xs"
+                        onClick={() => addExercise(dayIndex)}
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add Exercise
+                      </Button>
+                    </div>
                   </div>
+                ))}
+              </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-3 w-full"
-                    onClick={() => addExercise(dayIndex)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Exercise
-                  </Button>
-                </div>
-              ))}
+              <Button type="button" variant="outline" onClick={addDay} className="w-full">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Split Day
+              </Button>
+
+              {/* Bottom spacer so content clears the sticky footer */}
+              <div className="h-2" />
             </div>
+          </div>
 
-            <Button type="button" variant="outline" onClick={addDay} className="w-full">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Split Day
-            </Button>
-
+          {/* ── Sticky footer ── */}
+          <div className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6">
             <Button onClick={handleSave} disabled={isSaving} className="w-full">
               {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
               ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Workout Plan
-                </>
+                <><Save className="mr-2 h-4 w-4" />Save Workout Plan</>
               )}
             </Button>
           </div>
