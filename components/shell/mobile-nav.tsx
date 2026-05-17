@@ -13,29 +13,38 @@ interface MobileNavProps {
   className?: string
 }
 
+// NAV_H must match --mobile-nav-height in globals.css
+const NAV_H = 56
+
 export function MobileNav({ navItems, pendingCount, className }: MobileNavProps) {
   const pathname = usePathname()
   const [expanded, setExpanded] = useState(false)
 
-  // Primary items always visible (first 4), rest in overflow tray
   const primaryItems = navItems.slice(0, 4)
   const overflowItems = navItems.slice(4)
   const hasOverflow = overflowItems.length > 0
 
   return (
     <>
-      {/* Overflow tray — slides up when expanded */}
+      {/* ── Overflow tray ─────────────────────────────────────────────── */}
+      {/* Sits immediately ABOVE the nav bar — never overlaps it */}
       {hasOverflow && expanded && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setExpanded(false)}
-        >
+        <>
+          {/* Backdrop — full screen dimmer, closes tray on tap */}
           <div
-            className="bottom-nav-safe absolute bottom-0 left-0 right-0 border-t border-white/10 bg-background/98 backdrop-blur-xl"
+            className="fixed inset-0 z-40"
+            onClick={() => setExpanded(false)}
+          />
+
+          {/* Tray panel — anchored above the nav bar using bottom = NAV_H + safe-area */}
+          <div
+            className="fixed left-0 right-0 z-40 border-t border-white/10 bg-background/98 backdrop-blur-xl"
+            style={{
+              bottom: `calc(${NAV_H}px + env(safe-area-inset-bottom, 0px))`,
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Tray items */}
-            <div className="grid grid-cols-4 gap-0 px-2 pt-3 pb-2">
+            <div className="grid grid-cols-4 gap-0 px-2 py-3">
               {overflowItems.map((item) => {
                 const isActive =
                   pathname === item.href ||
@@ -48,9 +57,9 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
                     key={item.href}
                     href={item.href}
                     onClick={() => setExpanded(false)}
-                    className="flex flex-col items-center justify-center px-2 py-3 tap-target"
+                    className="flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-3 transition-colors hover:bg-white/5 active:bg-white/10"
                   >
-                    <div className="relative mb-1">
+                    <div className="relative">
                       <item.icon
                         className={cn(
                           "h-5 w-5",
@@ -65,7 +74,7 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
                     </div>
                     <span
                       className={cn(
-                        "text-[10px] font-medium",
+                        "text-[10px] font-medium leading-none",
                         isActive ? "text-primary" : "text-muted-foreground"
                       )}
                     >
@@ -76,10 +85,10 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
               })}
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* Bottom nav bar */}
+      {/* ── Bottom nav bar ────────────────────────────────────────────── */}
       <nav
         className={cn(
           "bottom-nav-safe fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-background/95 backdrop-blur-lg",
@@ -126,13 +135,13 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
             )
           })}
 
-          {/* More button — only when overflow exists */}
+          {/* More button */}
           {hasOverflow && (
             <li className="flex-1">
               <button
                 onClick={() => setExpanded((v) => !v)}
                 className={cn(
-                  "flex h-full w-full flex-col items-center justify-center gap-0.5 tap-target",
+                  "flex h-full w-full flex-col items-center justify-center gap-0.5 tap-target transition-colors",
                   expanded ? "text-primary" : "text-muted-foreground"
                 )}
               >
@@ -143,12 +152,12 @@ export function MobileNav({ navItems, pendingCount, className }: MobileNavProps)
                       expanded ? "rotate-180 text-primary" : ""
                     )}
                   />
-                  {/* Dot indicator if any overflow item has badge */}
-                  {!expanded && overflowItems.some(
-                    (i) => i.label === "Requests" && pendingCount && pendingCount > 0
-                  ) && (
-                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
-                  )}
+                  {!expanded &&
+                    overflowItems.some(
+                      (i) => i.label === "Requests" && pendingCount && pendingCount > 0
+                    ) && (
+                      <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary" />
+                    )}
                 </div>
                 <span className="text-[10px] font-medium leading-none">More</span>
               </button>
