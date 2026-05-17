@@ -8,14 +8,12 @@ import {
   Dumbbell,
   LayoutDashboard,
   Settings,
-  Users,
 } from "lucide-react"
 
 const clientNavItems: NavItem[] = [
   { label: "Dashboard", href: "/client", icon: LayoutDashboard },
   { label: "Attendance", href: "/client/attendance", icon: CalendarCheck },
   { label: "Workouts", href: "/client/workouts", icon: Dumbbell },
-  { label: "Trainers", href: "/client/trainers", icon: Users },
   { label: "Payments", href: "/client/payments", icon: CreditCard },
   { label: "Settings", href: "/client/settings", icon: Settings },
 ]
