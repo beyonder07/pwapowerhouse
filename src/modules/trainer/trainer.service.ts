@@ -1552,13 +1552,15 @@ export class TrainerPanelService {
   }
 
   private async getTableSalary() {
-    const trainerId = await this.getLegacyTrainerId()
-    if (!trainerId) return null
+    // trainer_salaries is keyed by user_id (the trainer's auth user ID).
+    // This is the same table the owner writes to via the salary management page.
+    const userId = this.ctx.authUserId
+    if (!userId) return null
 
     const { data, error } = await this.admin
-      .from("trainer_salary_records")
+      .from("trainer_salaries")
       .select("id,month_start,base_salary,bonus,status,paid_at")
-      .eq("trainer_id", trainerId)
+      .eq("user_id", userId)
       .order("month_start", { ascending: false })
       .limit(12)
 
@@ -1566,6 +1568,8 @@ export class TrainerPanelService {
       if (isMissingDbObjectError(error)) return null
       throw error
     }
+
+    if (!data || data.length === 0) return null
 
     return this.formatSalaryRows((data ?? []) as SalaryRow[], 0)
   }
