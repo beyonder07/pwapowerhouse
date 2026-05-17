@@ -441,15 +441,12 @@ export default function TrainerWorkoutsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           className={[
-            // Full width on mobile with 8px gutters, capped on desktop
-            "w-[calc(100vw-16px)] max-w-2xl",
-            // Height: almost full screen on mobile
-            "max-h-[88dvh]",
-            // Flex column so header + footer can be sticky
-            "flex flex-col",
-            // Remove default padding — we'll control it per-section
-            "gap-0 p-0",
-            "overflow-hidden",
+            // Mobile: Full-screen, zero margins, no rounding, sits above everything
+            "fixed inset-0 top-0 left-0 w-full h-full h-[100dvh] max-w-none max-h-none translate-x-0 translate-y-0 rounded-none border-0 z-[9999]",
+            // Desktop (sm+): floating card centered
+            "sm:fixed sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-[calc(100vw-16px)] sm:max-w-2xl sm:max-h-[88dvh] sm:rounded-lg sm:border",
+            // Layout structure
+            "flex flex-col gap-0 p-0 overflow-hidden",
           ].join(" ")}
         >
           {/* ── Sticky header ── */}
@@ -655,7 +652,7 @@ export default function TrainerWorkoutsPage() {
           </div>
 
           {/* ── Sticky footer ── */}
-          <div className="shrink-0 border-t border-border bg-background px-4 py-3 sm:px-6">
+          <div className="shrink-0 border-t border-border bg-background px-4 pt-3 pb-[calc(12px+env(safe-area-inset-bottom,0px))] sm:px-6 sm:py-3">
             <Button onClick={handleSave} disabled={isSaving} className="w-full">
               {isSaving ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
