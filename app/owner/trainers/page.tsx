@@ -242,22 +242,40 @@ export default function OwnerTrainersPage() {
           ) : trainers.map(t => (
             <button key={t.id} onClick={() => setSelectedId(t.id)} className="w-full text-left">
               <SurfaceCard interactive className="hover:border-primary/40">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     <Avatar className="h-10 w-10 shrink-0">
                       <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials(t.name)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="mb-0.5 flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-foreground">{t.name}</span>
-                        <StatusPill status={t.attendanceToday ? "success" : "neutral"} label={t.attendanceToday ? "Present" : "Absent"} size="sm" />
-                        <StatusPill status={salaryTone(t.salaryStatus)} label={`Salary ${t.salaryStatus}`} size="sm" />
+                        <span className="font-bold text-foreground">{t.name}</span>
+                        {/* Single attendance pill — neutral gray when absent, green when present */}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          t.attendanceToday
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-secondary text-muted-foreground"
+                        }`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${
+                            t.attendanceToday ? "bg-emerald-400" : "bg-muted-foreground"
+                          }`} />
+                          {t.attendanceToday ? "Present" : "Absent"}
+                        </span>
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {t.specialization ?? "Trainer"}{t.experience ? ` · ${t.experience}` : ""}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{t.specialization ?? "Trainer"}{t.experience ? ` · ${t.experience}` : ""}</span>
+                        {/* Salary status — small amber text, not a red pill */}
+                        {t.salaryStatus !== "paid" && (
+                          <span className={`font-medium ${
+                            t.salaryStatus === "processing" ? "text-blue-400" : "text-amber-500"
+                          }`}>
+                            · Salary {t.salaryStatus}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  {/* Only show salary if > 0 */}
                   {t.currentSalary > 0 && (
                     <div className="shrink-0 text-right">
                       <p className="text-sm font-bold text-foreground">{formatCurrency(t.currentSalary)}</p>

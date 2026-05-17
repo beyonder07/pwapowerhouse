@@ -262,12 +262,16 @@ export default function OwnerMembersPage() {
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
-                    {m.daysRemaining > 0 ? (
-                      <p className="text-sm font-bold text-foreground">{m.daysRemaining}d left</p>
-                    ) : (
-                      <p className="text-sm font-bold text-red-500">Expired</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">{m.lastCheckInRelative}</p>
+                    {m.membershipStatus === "active" || m.membershipStatus === "expiring" ? (
+                      <p className={`text-sm font-bold ${m.membershipStatus === "expiring" ? "text-amber-500" : "text-foreground"}`}>
+                        {m.daysRemaining}d left
+                      </p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      {m.lastCheckInRelative === "No attendance"
+                        ? "No check-ins yet"
+                        : m.lastCheckInRelative}
+                    </p>
                   </div>
                 </div>
               </SurfaceCard>

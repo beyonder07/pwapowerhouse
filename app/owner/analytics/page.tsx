@@ -155,7 +155,7 @@ function RevenueTab() {
           <BarChart data={weeklyData} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis dataKey="date" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
-            <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+            <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} tickFormatter={v => v === 0 ? '₹0' : `₹${(v/1000).toFixed(0)}k`} domain={[0, 'auto']} />
             <Tooltip contentStyle={{ backgroundColor: CHART_COLORS.tooltip.bg, border: `1px solid ${CHART_COLORS.tooltip.border}`, borderRadius: 8 }}
               formatter={(v: number) => [formatCurrency(v)]} />
             <Bar dataKey="revenue" fill="#10b981" name="Paid" radius={[4,4,0,0]} />
@@ -181,7 +181,7 @@ function RevenueTab() {
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis dataKey="month" stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} />
-            <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} />
+            <YAxis stroke={CHART_COLORS.axis} tick={{ fontSize: 11 }} tickFormatter={v => v === 0 ? '₹0' : `₹${(v/1000).toFixed(0)}k`} domain={[0, 'auto']} />
             <Tooltip contentStyle={{ backgroundColor: CHART_COLORS.tooltip.bg, border: `1px solid ${CHART_COLORS.tooltip.border}`, borderRadius: 8 }}
               formatter={(v: number) => [formatCurrency(v)]} />
             <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#revenueGrad)" strokeWidth={2} name="Revenue" />

@@ -840,13 +840,14 @@ export class AnalyticsService {
   }
 
   private async getRevenueFromTables(query: AnalyticsDateRangeQuery) {
+    const admin = createSupabaseServiceRoleClient()
     const { from, to } = rangeOrDefault(query)
     const monthStarts = lastMonthStarts(6)
     const monthlyFrom = monthStarts[0] ?? currentMonthStart()
 
     const [paymentsResult, pendingResult] = await Promise.all([
       withGymFilter(
-        this.ctx.supabase
+        admin
           .from("payments")
           .select("amount,status,created_at")
           .gte("created_at", `${monthlyFrom}T00:00:00.000Z`)
@@ -854,7 +855,7 @@ export class AnalyticsService {
         query.branchId
       ),
       withGymFilter(
-        this.ctx.supabase.from("payments").select("amount").eq("status", "pending"),
+        admin.from("payments").select("amount").eq("status", "pending"),
         query.branchId
       ),
     ])
