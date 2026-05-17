@@ -1,253 +1,510 @@
 "use client"
 
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { PageIntro, SurfaceCard, StatusPill, PaymentCard } from "@/components/powerhouse"
+import { FormEvent, useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { Banknote, CreditCard, Download, Image as ImageIcon, Loader2, PlusCircle, ShieldCheck, Smartphone, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
-  CreditCard,
-  Download,
-  Plus,
-  CheckCircle2,
-  AlertCircle,
-  Clock,
-} from "lucide-react"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
+import { cn } from "@/lib/utils"
+import { createClient } from "@supabase/supabase-js"
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+interface PaymentRow {
+  id: string
+  amount: number | string
+  planDuration: number
+  status: string
+  paymentMode: "upi" | "cash"
+  screenshotUrl?: string
+  createdAt: string
+  approvedAt: string | null
 }
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+interface PaymentsData {
+  currentPlan: {
+    id: string
+    status: "active" | "expired"
+    startDate: string
+    endDate: string
+    daysRemaining: number
+  } | null
+  pendingRequest: PaymentRow | null
+  history: PaymentRow[]
 }
 
-// Mock data
-const currentPlan = {
-  name: "Premium Membership",
-  price: 99,
-  billingCycle: "monthly",
-  nextBilling: "April 15, 2026",
-  features: [
-    "Unlimited gym access",
-    "2 PT sessions/month",
-    "Group classes included",
-    "Sauna & steam access",
-  ],
-}
-
-const paymentMethods = [
-  {
-    id: "1",
-    type: "visa" as const,
-    last4: "4242",
-    expiryMonth: "12",
-    expiryYear: "27",
-    isDefault: true,
-  },
-  {
-    id: "2",
-    type: "mastercard" as const,
-    last4: "8888",
-    expiryMonth: "06",
-    expiryYear: "26",
-    isDefault: false,
-  },
+const PLAN_OPTIONS = [
+  { label: "30 days", days: 30 },
+  { label: "90 days", days: 90 },
+  { label: "180 days", days: 180 },
+  { label: "365 days", days: 365 },
 ]
 
-const invoices = [
-  {
-    id: "INV-001",
-    date: "March 15, 2026",
-    amount: 99,
-    status: "paid" as const,
-    description: "Premium Membership - March 2026",
-  },
-  {
-    id: "INV-002",
-    date: "February 15, 2026",
-    amount: 99,
-    status: "paid" as const,
-    description: "Premium Membership - February 2026",
-  },
-  {
-    id: "INV-003",
-    date: "January 15, 2026",
-    amount: 149,
-    status: "paid" as const,
-    description: "Premium Membership + PT Session",
-  },
-  {
-    id: "INV-004",
-    date: "December 15, 2025",
-    amount: 99,
-    status: "paid" as const,
-    description: "Premium Membership - December 2025",
-  },
-]
+function formatCurrency(value: number | string) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value))
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Not available"
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+    new Date(value)
+  )
+}
 
 export default function ClientPaymentsPage() {
-  const [activeTab, setActiveTab] = useState("overview")
+  const [data, setData] = useState<PaymentsData | null>(null)
+  const [amount, setAmount] = useState("2500")
+  const [planDuration, setPlanDuration] = useState("30")
+  const [paymentMode, setPaymentMode] = useState<"upi" | "cash">("upi")
+  const [screenshotUrl, setScreenshotUrl] = useState("")
+  const [isUploading, setIsUploading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const selectedPlanLabel = useMemo(
+    () =>
+      PLAN_OPTIONS.find((plan) => String(plan.days) === planDuration)?.label ??
+      `${planDuration} days`,
+    [planDuration]
+  )
+
+  async function loadPayments() {
+    const response = await fetch("/api/client/payments", {
+      credentials: "include",
+      cache: "no-store",
+    })
+    const result = await response.json()
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "Unable to load payments")
+    }
+
+    setData(result.data)
+    setLoadFailed(false)
+  }
+
+  useEffect(() => {
+    let mounted = true
+
+    loadPayments()
+      .catch((error) => {
+        if (!mounted) return
+        setLoadFailed(true)
+        toast.error("Payments unavailable", {
+          description:
+            error instanceof Error ? error.message : "Please refresh the page.",
+        })
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      // 1. Get User ID for secure path (Required by new SQL policy)
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      if (authError || !user) throw new Error("Auth required for upload")
+
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${Math.random()}-${Date.now()}.${fileExt}`
+      
+      // Anti-Gravity: Using secure path 'payments/{userId}/{filename}' matching SQL policy
+      const filePath = `payments/${user.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("profile-images")
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("profile-images")
+        .getPublicUrl(filePath)
+
+      setScreenshotUrl(publicUrl)
+      toast.success("Screenshot uploaded successfully")
+    } catch (error: any) {
+      toast.error("Upload failed", { description: error.message })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    
+    if (paymentMode === "upi" && !screenshotUrl) {
+      toast.error("Screenshot required", { description: "Please upload your UPI payment proof." })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const response = await fetch("/api/client/payments/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          amount: Number(amount),
+          planDuration: Number(planDuration),
+          paymentMode,
+          screenshotUrl: paymentMode === "upi" ? screenshotUrl : undefined
+        }),
+      })
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Unable to create payment request")
+      }
+
+      toast.success("Payment request submitted", {
+        description: "The owner will approve it after manual verification.",
+      })
+      setScreenshotUrl("") 
+      await loadPayments()
+    } catch (error) {
+      toast.error("Request failed", {
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
+    <div className="space-y-6 pb-20">
       <PageIntro
         title="Payments"
-        subtitle="Manage your membership, payment methods, and billing history"
+        subtitle="Request membership renewals and track manual approvals"
       />
 
-      <motion.div variants={item}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="methods">Payment Methods</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
-          </TabsList>
+      {isLoading ? (
+        <SurfaceCard>
+          <div className="flex min-h-40 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </SurfaceCard>
+      ) : loadFailed || !data ? (
+        <SurfaceCard className="text-center">
+          <p className="text-muted-foreground">Could not load payment data.</p>
+          <Button
+            className="mt-4"
+            onClick={() => {
+              setIsLoading(true)
+              void loadPayments().finally(() => setIsLoading(false))
+            }}
+          >
+            Retry
+          </Button>
+        </SurfaceCard>
+      ) : (
+        <>
+          <SurfaceCard>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  Current Plan
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Your active membership window.
+                </p>
+              </div>
+              <StatusPill status={data?.currentPlan?.status ?? "expired"}>
+                {data?.currentPlan?.status ?? "No plan"}
+              </StatusPill>
+            </div>
 
-          <TabsContent value="overview" className="space-y-6">
-            {/* Current Plan */}
-            <SurfaceCard>
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-xl font-semibold text-foreground">
-                      {currentPlan.name}
-                    </h3>
-                    <StatusPill status="success">Active</StatusPill>
+            {data?.currentPlan ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="p-3 bg-secondary/30 rounded-lg">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                    Start Date
+                  </p>
+                  <p className="mt-1 font-semibold text-foreground text-sm">
+                    {formatDate(data.currentPlan.startDate)}
+                  </p>
+                </div>
+                <div className="p-3 bg-secondary/30 rounded-lg">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                    End Date
+                  </p>
+                  <p className="mt-1 font-semibold text-foreground text-sm">
+                    {formatDate(data.currentPlan.endDate)}
+                  </p>
+                </div>
+                <div className="p-3 bg-secondary/30 rounded-lg">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                    Days Remaining
+                  </p>
+                  <p className="mt-1 font-bold text-emerald-500">
+                    {data.currentPlan.daysRemaining}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No plan is attached yet. Submit a request to start or renew.
+              </p>
+            )}
+          </SurfaceCard>
+
+          <SurfaceCard className={cn(data?.pendingRequest && "border-amber-500/20 bg-amber-500/5")}>
+            <div className="mb-6 flex items-center gap-3">
+              <PlusCircle className={cn("h-5 w-5", data?.pendingRequest ? "text-amber-500" : "text-primary")} />
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">
+                  {data?.pendingRequest ? "Pending Request" : "New Payment Request"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {data?.pendingRequest 
+                    ? "The owner is currently verifying your request." 
+                    : "Choose your plan and payment method below."}
+                </p>
+              </div>
+            </div>
+
+            {data?.pendingRequest ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <p className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Details</p>
+                    <p className="text-xl font-bold text-foreground">
+                      {formatCurrency(data.pendingRequest.amount)}
+                    </p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      {data.pendingRequest.planDuration} day plan via 
+                      <span className="uppercase font-bold text-foreground">{data.pendingRequest.paymentMode}</span>
+                    </p>
                   </div>
-                  <p className="text-3xl font-bold text-foreground">
-                    ${currentPlan.price}
-                    <span className="text-sm font-normal text-muted-foreground">
-                      /{currentPlan.billingCycle}
-                    </span>
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Next billing: {currentPlan.nextBilling}
-                  </p>
+                  <div className="flex flex-col sm:items-end justify-center gap-2">
+                    <StatusPill status="pending">Awaiting Verification</StatusPill>
+                    <p className="text-xs text-muted-foreground">Submitted on {formatDate(data.pendingRequest.createdAt)}</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="outline">Change Plan</Button>
-                  <Button variant="outline">Cancel</Button>
-                </div>
+                {data.pendingRequest.screenshotUrl && (
+                  <div className="pt-4 border-t border-border/50">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2">Payment Proof</p>
+                    <a href={data.pendingRequest.screenshotUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-xs font-bold text-primary hover:underline">
+                      <ImageIcon className="h-4 w-4" />
+                      View Uploaded Screenshot
+                    </a>
+                  </div>
+                )}
               </div>
-
-              <div className="mt-6 pt-6 border-t border-border">
-                <h4 className="font-medium text-foreground mb-3">{"What's included"}</h4>
-                <ul className="grid sm:grid-cols-2 gap-2">
-                  {currentPlan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </SurfaceCard>
-
-            {/* Quick Stats */}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <SurfaceCard>
-                <p className="text-sm text-muted-foreground mb-1">This Month</p>
-                <p className="text-2xl font-bold text-foreground">$99.00</p>
-              </SurfaceCard>
-              <SurfaceCard>
-                <p className="text-sm text-muted-foreground mb-1">YTD Spent</p>
-                <p className="text-2xl font-bold text-foreground">$346.00</p>
-              </SurfaceCard>
-              <SurfaceCard>
-                <p className="text-sm text-muted-foreground mb-1">Member Since</p>
-                <p className="text-2xl font-bold text-foreground">Nov 2025</p>
-              </SurfaceCard>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="methods" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Saved Cards</h3>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Card
-              </Button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {paymentMethods.map((method) => (
-                <motion.div key={method.id} variants={item}>
-                  <PaymentCard
-                    type={method.type}
-                    last4={method.last4}
-                    expiryMonth={method.expiryMonth}
-                    expiryYear={method.expiryYear}
-                    isDefault={method.isDefault}
-                    onSetDefault={() => {}}
-                    onRemove={() => {}}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="history" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Billing History</h3>
-              <Button variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-            </div>
-
-            <SurfaceCard className="p-0 overflow-hidden">
-              <div className="divide-y divide-border">
-                {invoices.map((invoice) => (
-                  <div
-                    key={invoice.id}
-                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-lg bg-muted">
-                        <CreditCard className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">{invoice.description}</p>
-                        <p className="text-sm text-muted-foreground">{invoice.date}</p>
-                      </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid gap-6 md:grid-cols-3">
+                  {/* Mode Selection */}
+                  <div className="space-y-2">
+                    <Label>Payment Mode</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode("upi")}
+                        className={cn(
+                          "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-all",
+                          paymentMode === "upi" ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:bg-secondary"
+                        )}
+                      >
+                        <Smartphone className="h-4 w-4" />
+                        UPI
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMode("cash")}
+                        className={cn(
+                          "flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-all",
+                          paymentMode === "cash" ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:bg-secondary"
+                        )}
+                      >
+                        <Banknote className="h-4 w-4" />
+                        Cash
+                      </button>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-medium text-foreground">${invoice.amount}.00</p>
-                        <StatusPill
-                          status={
-                            invoice.status === "paid"
-                              ? "success"
-                              : invoice.status === "pending"
-                              ? "warning"
-                              : "error"
-                          }
-                        >
-                          {invoice.status}
-                        </StatusPill>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount (INR)</Label>
+                    <Input
+                      id="amount"
+                      inputMode="numeric"
+                      min="1"
+                      value={amount}
+                      onChange={(event) => setAmount(event.target.value)}
+                      required
+                      className="font-bold text-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Plan Duration</Label>
+                    <Select value={planDuration} onValueChange={setPlanDuration}>
+                      <SelectTrigger className="font-semibold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PLAN_OPTIONS.map((plan) => (
+                          <SelectItem key={plan.days} value={String(plan.days)}>
+                            {plan.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Conditional Screenshot Upload */}
+                {paymentMode === "upi" && (
+                  <div className="p-4 bg-secondary/20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-center gap-3">
+                    {screenshotUrl ? (
+                      <div className="flex items-center gap-3 text-emerald-500 font-bold text-sm">
+                        <ImageIcon className="h-5 w-5" />
+                        Screenshot ready for submission
+                        <Button variant="ghost" size="sm" onClick={() => setScreenshotUrl("")} className="text-muted-foreground hover:text-red-500 h-8">Remove</Button>
                       </div>
-                      <Button variant="ghost" size="icon">
-                        <Download className="h-4 w-4" />
-                      </Button>
+                    ) : (
+                      <>
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Upload className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold">Upload Payment Screenshot</p>
+                          <p className="text-xs text-muted-foreground">Mandatory for UPI verification</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="screenshot-upload"
+                          disabled={isUploading}
+                        />
+                        <Button 
+                          asChild 
+                          variant="secondary" 
+                          size="sm"
+                          disabled={isUploading}
+                        >
+                          <label htmlFor="screenshot-upload" className="cursor-pointer">
+                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Choose File"}
+                          </label>
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isSubmitting || isUploading}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Submitting Request...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="mr-2 h-5 w-5" />
+                      Submit Verification Request
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+          </SurfaceCard>
+
+          <SurfaceCard>
+            <div className="mb-4 flex items-center gap-3">
+              <CreditCard className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold text-foreground">
+                Verified Payment History
+              </h2>
+            </div>
+
+            {data?.history.length ? (
+              <div className="space-y-3">
+                {data.history.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="grid gap-3 rounded-lg border border-border bg-background p-4 sm:grid-cols-[1fr_auto] hover:border-primary/20 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <p className="font-bold text-foreground">
+                          {formatCurrency(payment.amount)}
+                        </p>
+                        <span className="px-1.5 py-0.5 rounded-md bg-secondary text-[10px] font-black uppercase tracking-tighter">
+                          {payment.paymentMode}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {payment.planDuration} days plan - Requested {formatDate(payment.createdAt)}
+                      </p>
+                      {payment.screenshotUrl && (
+                        <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="inline-block mt-2 text-[10px] font-bold text-primary hover:underline uppercase tracking-wider">
+                          View Receipt
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:items-end gap-2">
+                      <StatusPill status={payment.status} size="sm" />
+                      {payment.approvedAt && (
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                          Processed: {formatDate(payment.approvedAt)}
+                        </p>
+                      )}
+                      {["approved", "paid"].includes(payment.status) ? (
+                        <Button asChild variant="outline" size="sm">
+                          <a
+                            href={`/api/client/payments/invoice?paymentId=${encodeURIComponent(payment.id)}`}
+                            download
+                          >
+                            <Download className="h-4 w-4" />
+                            Invoice
+                          </a>
+                        </Button>
+                      ) : (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Invoice after approval
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
-            </SurfaceCard>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
-    </motion.div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your payment history is empty.
+              </p>
+            )}
+          </SurfaceCard>
+        </>
+      )}
+    </div>
   )
 }

@@ -13,10 +13,9 @@ export async function GET(req: NextRequest) {
       user: {
         id: auth.user.id,
         email: auth.user.email,
-        fullName: auth.user.full_name,
-        avatarUrl: auth.user.avatar_url,
+        fullName: auth.user.fullName,
         role: auth.user.role,
-        branchId: auth.user.branch_id,
+        gymId: auth.user.gymId,
       },
     })
   } catch (error) {

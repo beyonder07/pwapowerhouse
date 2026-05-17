@@ -20,11 +20,19 @@ interface MetricCardProps {
   accentColor?: "red" | "green" | "amber" | "default"
 }
 
+// Anti-Gravity: Using explicit color values to prevent theme-drift
 const accentStyles = {
-  red: "border-l-primary",
-  green: "border-l-emerald-500",
-  amber: "border-l-amber-500",
+  red: "border-l-[#ef4444]", // Vibrant Red
+  green: "border-l-[#10b981]", // Success Green (Emerald)
+  amber: "border-l-[#f59e0b]", // Warning Amber
   default: "border-l-border",
+}
+
+const iconColors = {
+  red: "text-[#ef4444]",
+  green: "text-[#10b981]",
+  amber: "text-[#f59e0b]",
+  default: "text-primary",
 }
 
 export function MetricCard({
@@ -78,7 +86,7 @@ export function MetricCard({
         </div>
         {Icon && (
           <div className="flex-shrink-0 rounded-lg bg-secondary p-2">
-            <Icon className="h-5 w-5 text-primary" />
+            <Icon className={cn("h-5 w-5", iconColors[accentColor])} />
           </div>
         )}
       </div>

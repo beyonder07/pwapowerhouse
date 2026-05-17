@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import { AppVersionManager } from "@/components/app-version-manager"
+import { ThemeProvider } from "@/components/providers/theme-provider"
 import { PwaScrollBoundaryGuard } from "@/components/pwa-scroll-boundary-guard"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
@@ -69,7 +70,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark bg-background">
+    <html lang="en" className="dark bg-background" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -79,11 +80,13 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-background">
-        <div id="root" className="app-root">
-          <AppVersionManager />
-          <PwaScrollBoundaryGuard />
-          {children}
-        </div>
+        <ThemeProvider>
+          <div id="root" className="app-root">
+            <AppVersionManager />
+            <PwaScrollBoundaryGuard />
+            {children}
+          </div>
+        </ThemeProvider>
         <Toaster
           position="top-center"
           toastOptions={{

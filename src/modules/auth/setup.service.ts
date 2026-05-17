@@ -42,13 +42,20 @@ export class OwnerSetupService {
       throw createError ?? new Error("Unable to create owner account")
     }
 
+    const { data: defaultGym } = await supabase
+      .from("gyms")
+      .select("id")
+      .order("name")
+      .limit(1)
+      .maybeSingle()
+
     const { error: profileError } = await supabase.from("users").upsert({
       id: authData.user.id,
       email: input.email,
-      full_name: input.fullName,
+      name: input.fullName,
       phone: input.phone,
       role: "owner",
-      is_active: true,
+      gym_id: defaultGym?.id ?? null,
     })
 
     if (profileError) {

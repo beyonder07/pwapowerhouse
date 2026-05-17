@@ -3,22 +3,20 @@
 import { AuthenticatedShell } from "@/components/shell"
 import type { NavItem } from "@/components/shell"
 import {
-  LayoutDashboard,
-  Dumbbell,
-  Calendar,
-  Users,
+  CalendarCheck,
   CreditCard,
+  Dumbbell,
+  LayoutDashboard,
   Settings,
-  User,
+  Users,
 } from "lucide-react"
 
 const clientNavItems: NavItem[] = [
   { label: "Dashboard", href: "/client", icon: LayoutDashboard },
-  { label: "My Workouts", href: "/client/workouts", icon: Dumbbell },
-  { label: "My Schedule", href: "/client/schedule", icon: Calendar },
-  { label: "My Trainers", href: "/client/trainers", icon: Users },
+  { label: "Attendance", href: "/client/attendance", icon: CalendarCheck },
+  { label: "Workouts", href: "/client/workouts", icon: Dumbbell },
+  { label: "Trainers", href: "/client/trainers", icon: Users },
   { label: "Payments", href: "/client/payments", icon: CreditCard },
-  { label: "Profile", href: "/client/profile", icon: User },
   { label: "Settings", href: "/client/settings", icon: Settings },
 ]
 

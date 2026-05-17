@@ -7,6 +7,7 @@ export function ok<T>(data: T, status = 200) {
 }
 
 export function fail(error: unknown) {
+  // Anti-Gravity: Detailed error reporting for debugging
   if (error instanceof AppError) {
     return NextResponse.json(
       { success: false, error: error.message, code: error.code },
@@ -26,13 +27,18 @@ export function fail(error: unknown) {
     )
   }
 
-  console.error(error)
+  // Log to server console
+  console.error("API Error Trace:", error)
+
+  const message = error instanceof Error ? error.message : "Internal server error"
+  const details = (error as any)?.details || (error as any)?.hint || undefined
 
   return NextResponse.json(
     {
       success: false,
-      error: "Internal server error",
-      code: "INTERNAL_ERROR",
+      error: message,
+      details: details,
+      code: (error as any)?.code || "INTERNAL_ERROR",
     },
     { status: 500 }
   )

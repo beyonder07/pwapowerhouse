@@ -1,264 +1,195 @@
 "use client"
 
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { PageIntro, SurfaceCard, SearchToolbar, StatusPill } from "@/components/powerhouse"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import { Loader2, Users, CheckCircle2, XCircle } from "lucide-react"
+import { toast } from "sonner"
+import { EmptyState, PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Star,
-  MessageSquare,
-  Calendar,
-  Award,
-  Clock,
-  MapPin,
-} from "lucide-react"
-import Link from "next/link"
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+interface TrainerInfo {
+  id: string
+  name: string
+  email: string | null
+  avatarUrl: string | null
+  specialization: string | null
+  experience: string | null
+  presentToday: boolean
+  joinDate: string
 }
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
 }
 
-// Mock data
-const myTrainers = [
-  {
-    id: "1",
-    name: "Mike Torres",
-    avatar: null,
-    specialties: ["Strength Training", "Bodybuilding"],
-    rating: 4.9,
-    reviewCount: 127,
-    sessionsCompleted: 24,
-    nextSession: "Today, 10:00 AM",
-    branch: "Downtown Branch",
-    bio: "NASM certified trainer with 8+ years of experience in strength and conditioning.",
-  },
-  {
-    id: "2",
-    name: "Sarah Lee",
-    avatar: null,
-    specialties: ["HIIT", "Yoga", "Flexibility"],
-    rating: 4.8,
-    reviewCount: 98,
-    sessionsCompleted: 12,
-    nextSession: "Tomorrow, 9:00 AM",
-    branch: "Westside Branch",
-    bio: "Certified yoga instructor and HIIT specialist focused on functional fitness.",
-  },
-]
-
-const availableTrainers = [
-  {
-    id: "3",
-    name: "Carlos Rodriguez",
-    avatar: null,
-    specialties: ["CrossFit", "Olympic Lifting"],
-    rating: 4.7,
-    reviewCount: 85,
-    branch: "Downtown Branch",
-    availability: "Mon, Wed, Fri",
-  },
-  {
-    id: "4",
-    name: "Emma Wilson",
-    avatar: null,
-    specialties: ["Pilates", "Rehabilitation"],
-    rating: 4.9,
-    reviewCount: 156,
-    branch: "Eastside Branch",
-    availability: "Tue, Thu, Sat",
-  },
-  {
-    id: "5",
-    name: "David Kim",
-    avatar: null,
-    specialties: ["Boxing", "Cardio Kickboxing"],
-    rating: 4.6,
-    reviewCount: 72,
-    branch: "Downtown Branch",
-    availability: "Daily",
-  },
-]
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+    new Date(value)
+  )
+}
 
 export default function ClientTrainersPage() {
-  const [search, setSearch] = useState("")
-  const [activeTab, setActiveTab] = useState("my-trainers")
+  const [trainers, setTrainers] = useState<TrainerInfo[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredMyTrainers = myTrainers.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.specialties.some((s) => s.toLowerCase().includes(search.toLowerCase()))
-  )
+  useEffect(() => {
+    let mounted = true
 
-  const filteredAvailableTrainers = availableTrainers.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      t.specialties.some((s) => s.toLowerCase().includes(search.toLowerCase()))
-  )
+    async function loadTrainers() {
+      try {
+        const response = await fetch("/api/client/trainer", {
+          credentials: "include",
+          cache: "no-store",
+        })
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Unable to load trainers")
+        }
+
+        if (mounted) setTrainers(result.data.trainers)
+      } catch (error) {
+        toast.error("Trainers unavailable", {
+          description:
+            error instanceof Error ? error.message : "Please refresh and try again.",
+        })
+      } finally {
+        if (mounted) setIsLoading(false)
+      }
+    }
+
+    loadTrainers()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-5">
+        <PageIntro
+          title="My Trainers"
+          description="Trainers assigned to your gym branch"
+        />
+        <div className="flex h-48 items-center justify-center rounded-xl border border-border bg-card">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  if (trainers.length === 0) {
+    return (
+      <div className="space-y-5">
+        <PageIntro
+          title="My Trainers"
+          description="Trainers assigned to your gym branch"
+        />
+        <EmptyState
+          icon={Users}
+          title="No trainers found"
+          description="There are no trainers assigned to your branch yet. Contact the gym owner."
+        />
+      </div>
+    )
+  }
+
+  const presentCount = trainers.filter((t) => t.presentToday).length
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
+    <div className="space-y-5">
       <PageIntro
         title="My Trainers"
-        subtitle="Connect with your trainers and explore new ones"
+        description="Trainers assigned to your gym branch"
       />
 
-      <motion.div variants={item}>
-        <SearchToolbar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search trainers or specialties..."
-        />
-      </motion.div>
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3">
+        <SurfaceCard>
+          <p className="text-xs text-muted-foreground">Total Trainers</p>
+          <p className="mt-1 text-3xl font-bold text-foreground">{trainers.length}</p>
+        </SurfaceCard>
+        <SurfaceCard>
+          <p className="text-xs text-muted-foreground">Present Today</p>
+          <p className="mt-1 text-3xl font-bold text-emerald-500">{presentCount}</p>
+        </SurfaceCard>
+      </div>
 
-      <motion.div variants={item}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="my-trainers">My Trainers</TabsTrigger>
-            <TabsTrigger value="explore">Explore</TabsTrigger>
-          </TabsList>
+      {/* Trainer Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {trainers.map((trainer) => (
+          <SurfaceCard key={trainer.id} className="space-y-4">
+            <div className="flex items-start gap-3">
+              <Avatar className="h-12 w-12 shrink-0">
+                <AvatarImage src={trainer.avatarUrl ?? undefined} alt={trainer.name} />
+                <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                  {initials(trainer.name)}
+                </AvatarFallback>
+              </Avatar>
 
-          <TabsContent value="my-trainers" className="space-y-4">
-            {filteredMyTrainers.map((trainer) => (
-              <motion.div key={trainer.id} variants={item}>
-                <SurfaceCard className="hover:border-primary/50 transition-colors">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage src={trainer.avatar || undefined} />
-                        <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                          {trainer.name.split(" ").map((n) => n[0]).join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground text-lg">
-                          {trainer.name}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex items-center gap-1 text-yellow-500">
-                            <Star className="h-4 w-4 fill-current" />
-                            <span className="text-sm font-medium">{trainer.rating}</span>
-                          </div>
-                          <span className="text-sm text-muted-foreground">
-                            ({trainer.reviewCount} reviews)
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {trainer.specialties.map((specialty) => (
-                            <StatusPill key={specialty} status="neutral">
-                              {specialty}
-                            </StatusPill>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 space-y-2 text-sm">
-                      <p className="text-muted-foreground">{trainer.bio}</p>
-                      <div className="flex items-center gap-4 pt-2">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Award className="h-4 w-4" />
-                          {trainer.sessionsCompleted} sessions
-                        </div>
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          {trainer.branch}
-                        </div>
-                      </div>
-                      {trainer.nextSession && (
-                        <div className="flex items-center gap-1 text-primary">
-                          <Clock className="h-4 w-4" />
-                          Next: {trainer.nextSession}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-row md:flex-col gap-2">
-                      <Button asChild>
-                        <Link href={`/client/trainers/${trainer.id}/book`}>
-                          <Calendar className="mr-2 h-4 w-4" />
-                          Book
-                        </Link>
-                      </Button>
-                      <Button variant="outline">
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        Message
-                      </Button>
-                    </div>
-                  </div>
-                </SurfaceCard>
-              </motion.div>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="explore" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredAvailableTrainers.map((trainer) => (
-                <motion.div key={trainer.id} variants={item}>
-                  <SurfaceCard className="h-full hover:border-primary/50 transition-colors">
-                    <div className="flex items-center gap-4 mb-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={trainer.avatar || undefined} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {trainer.name.split(" ").map((n) => n[0]).join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-semibold text-foreground">{trainer.name}</h3>
-                        <div className="flex items-center gap-1 text-yellow-500">
-                          <Star className="h-3 w-3 fill-current" />
-                          <span className="text-xs font-medium">{trainer.rating}</span>
-                          <span className="text-xs text-muted-foreground">
-                            ({trainer.reviewCount})
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {trainer.specialties.map((specialty) => (
-                        <StatusPill key={specialty} status="neutral">
-                          {specialty}
-                        </StatusPill>
-                      ))}
-                    </div>
-
-                    <div className="space-y-2 text-sm text-muted-foreground mb-4">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4" />
-                        {trainer.branch}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        Available: {trainer.availability}
-                      </div>
-                    </div>
-
-                    <Button className="w-full" variant="outline">
-                      View Profile
-                    </Button>
-                  </SurfaceCard>
-                </motion.div>
-              ))}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground">
+                    {trainer.name}
+                  </h2>
+                  <StatusPill
+                    status={trainer.presentToday ? "success" : "neutral"}
+                    label={trainer.presentToday ? "Present Today" : "Absent"}
+                    size="sm"
+                  />
+                </div>
+                {trainer.specialization && (
+                  <p className="truncate text-sm text-muted-foreground">
+                    {trainer.specialization}
+                  </p>
+                )}
+              </div>
             </div>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
-    </motion.div>
+
+            <div className="grid gap-2">
+              {trainer.experience && (
+                <div className="rounded-lg bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Experience</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">
+                    {trainer.experience}
+                  </p>
+                </div>
+              )}
+              {trainer.email && (
+                <div className="rounded-lg bg-background p-3">
+                  <p className="text-xs text-muted-foreground">Contact</p>
+                  <p className="mt-0.5 truncate text-sm font-medium text-foreground">
+                    {trainer.email}
+                  </p>
+                </div>
+              )}
+              <div className="rounded-lg bg-background p-3">
+                <p className="text-xs text-muted-foreground">Member since</p>
+                <p className="mt-0.5 text-sm font-medium text-foreground">
+                  {formatDate(trainer.joinDate)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-border pt-3">
+              {trainer.presentToday ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {trainer.presentToday
+                  ? "This trainer has checked in today and is available"
+                  : "This trainer has not checked in today"}
+              </p>
+            </div>
+          </SurfaceCard>
+        ))}
+      </div>
+    </div>
   )
 }

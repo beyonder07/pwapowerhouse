@@ -1,7 +1,8 @@
 import type { Session } from "@supabase/supabase-js"
 import type { NextRequest, NextResponse } from "next/server"
 
-const useSecureCookiePrefix = process.env.NODE_ENV === "production"
+const useSecureCookiePrefix =
+  process.env.COOKIE_SECURE === "true" || process.env.VERCEL === "1"
 
 export const ACCESS_COOKIE = useSecureCookiePrefix
   ? "__Host-ph_access"

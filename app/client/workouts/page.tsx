@@ -1,302 +1,215 @@
 "use client"
 
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { PageIntro, SurfaceCard, StatusPill, SearchToolbar, EmptyState } from "@/components/powerhouse"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
+import { useEffect, useState } from "react"
 import {
+  CalendarDays,
   Dumbbell,
-  Clock,
-  Play,
-  CheckCircle2,
-  Calendar,
-  ChevronRight,
-  BarChart3,
+  Loader2,
+  RotateCcw,
+  UserRound,
 } from "lucide-react"
-import Link from "next/link"
+import { toast } from "sonner"
+import { EmptyState, PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 },
-  },
+interface WorkoutExercise {
+  name: string
+  sets: number
+  reps: string
+  restDuration: string
+  notes: string
 }
 
-const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+interface WorkoutDay {
+  day: string
+  exercises: WorkoutExercise[]
 }
 
-// Mock data
-const assignedWorkouts = [
-  {
-    id: "1",
-    name: "Upper Body Strength",
-    trainer: "Mike Torres",
-    duration: "45 min",
-    exercises: 8,
-    difficulty: "intermediate",
-    lastCompleted: null,
-    scheduled: "Today, 10:00 AM",
-  },
-  {
-    id: "2",
-    name: "HIIT Cardio Blast",
-    trainer: "Sarah Lee",
-    duration: "30 min",
-    exercises: 12,
-    difficulty: "advanced",
-    lastCompleted: "2 days ago",
-    scheduled: "Tomorrow, 9:00 AM",
-  },
-  {
-    id: "3",
-    name: "Leg Day Power",
-    trainer: "Mike Torres",
-    duration: "50 min",
-    exercises: 10,
-    difficulty: "intermediate",
-    lastCompleted: "5 days ago",
-    scheduled: "Wed, 11:00 AM",
-  },
-  {
-    id: "4",
-    name: "Core & Flexibility",
-    trainer: "Sarah Lee",
-    duration: "35 min",
-    exercises: 15,
-    difficulty: "beginner",
-    lastCompleted: "1 week ago",
-    scheduled: null,
-  },
-]
+interface WorkoutPlan {
+  id: string
+  title: string
+  notes: string
+  status: "active" | "pending" | "archived"
+  split: WorkoutDay[]
+  dayCount: number
+  exerciseCount: number
+  trainerName: string | null
+  updatedAt: string
+  createdAt: string
+}
 
-const completedWorkouts = [
-  {
-    id: "c1",
-    name: "Full Body Circuit",
-    completedAt: "Yesterday",
-    duration: "42 min",
-    calories: 380,
-  },
-  {
-    id: "c2",
-    name: "Upper Body Strength",
-    completedAt: "3 days ago",
-    duration: "48 min",
-    calories: 320,
-  },
-  {
-    id: "c3",
-    name: "HIIT Cardio Blast",
-    completedAt: "5 days ago",
-    duration: "28 min",
-    calories: 450,
-  },
-]
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+    new Date(value)
+  )
+}
 
-const difficultyColors = {
-  beginner: "success",
-  intermediate: "warning",
-  advanced: "error",
-} as const
+function planStatusTone(status: string) {
+  if (status === "active") return "success"
+  if (status === "pending") return "warning"
+  return "neutral"
+}
 
 export default function ClientWorkoutsPage() {
-  const [search, setSearch] = useState("")
-  const [activeTab, setActiveTab] = useState("assigned")
+  const [plan, setPlan] = useState<WorkoutPlan | null | undefined>(undefined)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const filteredWorkouts = assignedWorkouts.filter(
-    (w) =>
-      w.name.toLowerCase().includes(search.toLowerCase()) ||
-      w.trainer.toLowerCase().includes(search.toLowerCase())
-  )
+  useEffect(() => {
+    let mounted = true
+
+    async function loadPlan() {
+      try {
+        const response = await fetch("/api/client/workouts", {
+          credentials: "include",
+          cache: "no-store",
+        })
+        const result = await response.json()
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "Unable to load workout plan")
+        }
+
+        if (mounted) setPlan(result.data.plan ?? null)
+      } catch (error) {
+        toast.error("Workout plan unavailable", {
+          description:
+            error instanceof Error ? error.message : "Please refresh and try again.",
+        })
+      } finally {
+        if (mounted) setIsLoading(false)
+      }
+    }
+
+    loadPlan()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="space-y-5">
+        <PageIntro
+          title="My Workout Plan"
+          description="Your personalised trainer-assigned workout program"
+        />
+        <div className="flex h-48 items-center justify-center rounded-xl border border-border bg-card">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!plan) {
+    return (
+      <div className="space-y-5">
+        <PageIntro
+          title="My Workout Plan"
+          description="Your personalised trainer-assigned workout program"
+        />
+        <EmptyState
+          icon={Dumbbell}
+          title="No workout plan yet"
+          description="Your trainer hasn't created a workout plan for you yet. Contact the gym to get started."
+        />
+      </div>
+    )
+  }
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
+    <div className="space-y-5">
       <PageIntro
-        title="My Workouts"
-        subtitle="View your assigned workouts and track your progress"
+        title="My Workout Plan"
+        description="Your personalised trainer-assigned workout program"
       />
 
-      <motion.div variants={item}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
-            <TabsTrigger value="assigned">Assigned</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="stats">Stats</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="assigned" className="space-y-4">
-            <SearchToolbar
-              value={search}
-              onChange={setSearch}
-              placeholder="Search workouts..."
-            />
-
-            {filteredWorkouts.length === 0 ? (
-              <EmptyState
-                icon={Dumbbell}
-                title="No workouts found"
-                description="No workouts match your search criteria"
+      {/* Plan Header Card */}
+      <SurfaceCard>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-xl font-semibold text-foreground">{plan.title}</h2>
+              <StatusPill
+                status={planStatusTone(plan.status)}
+                label={plan.status === "pending" ? "Needs Update" : plan.status}
+                size="sm"
               />
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {filteredWorkouts.map((workout) => (
-                  <motion.div key={workout.id} variants={item}>
-                    <SurfaceCard className="h-full hover:border-primary/50 transition-colors">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-foreground">{workout.name}</h3>
-                          <p className="text-sm text-muted-foreground">by {workout.trainer}</p>
-                        </div>
-                        <StatusPill status={difficultyColors[workout.difficulty as keyof typeof difficultyColors]}>
-                          {workout.difficulty}
-                        </StatusPill>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {workout.duration}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Dumbbell className="h-4 w-4" />
-                          {workout.exercises} exercises
-                        </div>
-                      </div>
-
-                      {workout.scheduled && (
-                        <div className="flex items-center gap-2 text-sm text-primary mb-4">
-                          <Calendar className="h-4 w-4" />
-                          {workout.scheduled}
-                        </div>
-                      )}
-
-                      {workout.lastCompleted && (
-                        <p className="text-xs text-muted-foreground mb-4">
-                          Last completed: {workout.lastCompleted}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <Button className="flex-1" asChild>
-                          <Link href={`/client/workouts/${workout.id}`}>
-                            <Play className="mr-2 h-4 w-4" />
-                            Start
-                          </Link>
-                        </Button>
-                        <Button variant="outline" size="icon" asChild>
-                          <Link href={`/client/workouts/${workout.id}/details`}>
-                            <ChevronRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </SurfaceCard>
-                  </motion.div>
-                ))}
+            </div>
+            {plan.notes && (
+              <p className="mt-2 text-sm text-muted-foreground">{plan.notes}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {plan.trainerName && (
+              <div className="flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1">
+                <UserRound className="h-3 w-3 text-primary" />
+                <span className="font-medium text-foreground">{plan.trainerName}</span>
               </div>
             )}
-          </TabsContent>
+            <div className="flex items-center gap-1 rounded-full border border-border bg-secondary px-3 py-1">
+              <CalendarDays className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Updated {formatDate(plan.updatedAt)}</span>
+            </div>
+          </div>
+        </div>
 
-          <TabsContent value="completed" className="space-y-4">
-            {completedWorkouts.length === 0 ? (
-              <EmptyState
-                icon={CheckCircle2}
-                title="No completed workouts"
-                description="Complete your first workout to see it here"
-              />
-            ) : (
-              <div className="space-y-3">
-                {completedWorkouts.map((workout) => (
-                  <motion.div key={workout.id} variants={item}>
-                    <SurfaceCard className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <CheckCircle2 className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-foreground">{workout.name}</h4>
-                          <p className="text-sm text-muted-foreground">{workout.completedAt}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium text-foreground">{workout.calories} cal</p>
-                        <p className="text-sm text-muted-foreground">{workout.duration}</p>
-                      </div>
-                    </SurfaceCard>
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-lg bg-background p-3">
+            <p className="text-xs text-muted-foreground">Split Days</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{plan.dayCount}</p>
+          </div>
+          <div className="rounded-lg bg-background p-3">
+            <p className="text-xs text-muted-foreground">Total Exercises</p>
+            <p className="mt-1 text-2xl font-bold text-foreground">{plan.exerciseCount}</p>
+          </div>
+          <div className="col-span-2 rounded-lg bg-background p-3 sm:col-span-1">
+            <p className="text-xs text-muted-foreground">Plan Status</p>
+            <p className="mt-1 text-sm font-semibold capitalize text-foreground">
+              {plan.status === "pending" ? "Needs Update" : plan.status}
+            </p>
+          </div>
+        </div>
+      </SurfaceCard>
 
-          <TabsContent value="stats" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <SurfaceCard>
-                <div className="flex items-center gap-3 mb-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">This Week</span>
-                </div>
-                <p className="text-3xl font-bold text-foreground">4</p>
-                <p className="text-sm text-muted-foreground">workouts completed</p>
-              </SurfaceCard>
-
-              <SurfaceCard>
-                <div className="flex items-center gap-3 mb-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Total Time</span>
-                </div>
-                <p className="text-3xl font-bold text-foreground">3h 42m</p>
-                <p className="text-sm text-muted-foreground">this week</p>
-              </SurfaceCard>
-
-              <SurfaceCard>
-                <div className="flex items-center gap-3 mb-2">
-                  <Dumbbell className="h-5 w-5 text-primary" />
-                  <span className="text-sm text-muted-foreground">Calories</span>
-                </div>
-                <p className="text-3xl font-bold text-foreground">2,450</p>
-                <p className="text-sm text-muted-foreground">burned this week</p>
-              </SurfaceCard>
+      {/* Day-by-day split */}
+      <div className="space-y-4">
+        {plan.split.map((day, dayIndex) => (
+          <SurfaceCard key={dayIndex}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground">{day.day}</h3>
+              <span className="text-xs text-muted-foreground">
+                {day.exercises.length} exercise{day.exercises.length !== 1 ? "s" : ""}
+              </span>
             </div>
 
-            <SurfaceCard>
-              <h3 className="font-semibold text-foreground mb-4">Weekly Goal Progress</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Workouts (4/5)</span>
-                    <span className="text-foreground">80%</span>
+            <div className="space-y-3">
+              {day.exercises.map((exercise, exerciseIndex) => (
+                <div
+                  key={exerciseIndex}
+                  className="rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <p className="font-medium text-foreground">{exercise.name}</p>
+                    <div className="flex shrink-0 gap-2 text-xs">
+                      <span className="rounded bg-primary/10 px-2 py-0.5 font-bold text-primary">
+                        {exercise.sets} × {exercise.reps}
+                      </span>
+                    </div>
                   </div>
-                  <Progress value={80} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Active Minutes (222/300)</span>
-                    <span className="text-foreground">74%</span>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <RotateCcw className="h-3 w-3" />
+                      Rest: {exercise.restDuration}
+                    </span>
+                    {exercise.notes && (
+                      <span className="italic">{exercise.notes}</span>
+                    )}
                   </div>
-                  <Progress value={74} className="h-2" />
                 </div>
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Calories (2,450/3,000)</span>
-                    <span className="text-foreground">82%</span>
-                  </div>
-                  <Progress value={82} className="h-2" />
-                </div>
-              </div>
-            </SurfaceCard>
-          </TabsContent>
-        </Tabs>
-      </motion.div>
-    </motion.div>
+              ))}
+            </div>
+          </SurfaceCard>
+        ))}
+      </div>
+    </div>
   )
 }

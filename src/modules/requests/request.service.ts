@@ -14,6 +14,9 @@ export class RequestService {
         email: input.email,
         phone: input.phone,
         branchId: input.branchId,
+        govtIdUrl: input.govtIdUrl,
+        govtIdType: input.govtIdType,
+        govtIdNumber: input.govtIdNumber,
       },
       status: "pending",
     })
@@ -37,6 +40,7 @@ export class RequestService {
         openToAnyBranch: input.openToAnyBranch,
         specialization: input.specialization,
         experience: input.experience,
+        govtIdUrl: input.govtIdUrl ?? null,
         about: input.about ?? null,
       },
       status: "pending",

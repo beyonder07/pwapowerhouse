@@ -93,9 +93,7 @@ export default function LoginPage() {
         description: `Redirecting to ${role} dashboard...`,
       })
 
-      setTimeout(() => {
-        router.replace(`/${role}`)
-      }, 500)
+      router.replace(role === "client" ? "/client" : role === "trainer" ? "/trainer/dashboard" : `/${role}`)
     } catch (error) {
       toast.error("Unable to sign in", {
         description:

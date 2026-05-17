@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, CheckCircle, Upload, X } from "lucide-react"
+import { FileCheck, Loader2, CheckCircle, Upload, X } from "lucide-react"
 import { toast } from "sonner"
 
 interface BranchOption {
@@ -40,6 +40,8 @@ export default function TrainerSignupPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [profileImage, setProfileImage] = useState<File | null>(null)
   const [profilePreview, setProfilePreview] = useState<string | null>(null)
+  const [govtIdUrl, setGovtIdUrl] = useState("")
+  const [isUploadingGovtId, setIsUploadingGovtId] = useState(false)
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [formData, setFormData] = useState({
     fullName: "",
@@ -110,6 +112,60 @@ export default function TrainerSignupPage() {
     }
   }
 
+  const handleGovtIdUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Unsupported file type", {
+        description: "Please upload a JPG, PNG, or WebP photo.",
+      })
+      e.target.value = ""
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Photo too large", {
+        description: "Please select a government ID photo under 5MB.",
+      })
+      e.target.value = ""
+      return
+    }
+
+    setIsUploadingGovtId(true)
+
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("/api/requests/trainer/govt-id", {
+        method: "POST",
+        body: formData,
+      })
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Unable to upload government ID photo")
+      }
+
+      setGovtIdUrl(result.data.publicUrl)
+      setErrors((current) => {
+        const next = { ...current }
+        delete next.govtIdUrl
+        return next
+      })
+      toast.success("Government ID photo uploaded")
+    } catch (error) {
+      toast.error("Upload failed", {
+        description:
+          error instanceof Error ? error.message : "Please try again.",
+      })
+    } finally {
+      setIsUploadingGovtId(false)
+      e.target.value = ""
+    }
+  }
+
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
@@ -141,6 +197,10 @@ export default function TrainerSignupPage() {
       newErrors.experience = "Please enter your experience"
     }
 
+    if (!govtIdUrl) {
+      newErrors.govtIdUrl = "Please upload a government ID photo"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -165,6 +225,7 @@ export default function TrainerSignupPage() {
           openToAnyBranch,
           specialization: formData.specialization,
           experience: formData.experience,
+          govtIdUrl,
           about: formData.about,
         }),
       })
@@ -450,6 +511,92 @@ export default function TrainerSignupPage() {
           )}
         </div>
 
+        {/* Government ID Photo */}
+        <div className="space-y-2">
+          <Label className="text-xs sm:text-sm">Government ID Photo</Label>
+          <div
+            className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
+              govtIdUrl
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : "border-border bg-secondary/40"
+            }`}
+          >
+            {govtIdUrl ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-emerald-500">
+                  <FileCheck className="h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase tracking-widest">
+                    ID Photo Uploaded
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    asChild
+                    className="h-8 text-[10px] font-black uppercase tracking-widest"
+                  >
+                    <a href={govtIdUrl} target="_blank" rel="noreferrer">
+                      View
+                    </a>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setGovtIdUrl("")}
+                    className="h-8 text-[10px] font-black uppercase tracking-widest"
+                    disabled={isLoading || isUploadingGovtId}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-center">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Upload a clear photo of your government ID
+                </p>
+                <input
+                  id="trainer-govt-id"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGovtIdUpload}
+                  className="sr-only"
+                  disabled={isLoading || isUploadingGovtId}
+                />
+                <Button
+                  asChild
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-9 w-full gap-2"
+                  disabled={isLoading || isUploadingGovtId}
+                >
+                  <label htmlFor="trainer-govt-id" className="cursor-pointer">
+                    {isUploadingGovtId ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-3 w-3" />
+                    )}
+                    {isUploadingGovtId ? "Uploading..." : "Select Photo"}
+                  </label>
+                </Button>
+              </div>
+            )}
+          </div>
+          {errors.govtIdUrl && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs text-destructive"
+            >
+              {errors.govtIdUrl}
+            </motion.p>
+          )}
+        </div>
+
         {/* About */}
         <div className="space-y-2">
           <Label htmlFor="about" className="text-xs sm:text-sm">About You (Optional)</Label>
@@ -468,7 +615,7 @@ export default function TrainerSignupPage() {
         <Button
           type="submit"
           className="w-full tap-target h-9 sm:h-10 text-sm sm:text-base"
-          disabled={isLoading || isLoadingBranches}
+          disabled={isLoading || isLoadingBranches || isUploadingGovtId}
         >
           {isLoading ? (
             <>

@@ -3,21 +3,35 @@ import { createSupabaseAuthClient } from "@/src/services/supabase.service"
 export interface BranchSummary {
   id: string
   name: string
+  radius: number
 }
 
 export class BranchesService {
   async listActive(): Promise<BranchSummary[]> {
     const supabase = createSupabaseAuthClient()
     const { data, error } = await supabase
+      .from("gyms")
+      .select("id,name,radius")
+      .order("name")
+
+    if (!error) {
+      return data ?? []
+    }
+
+    const legacy = await supabase
       .from("gym_branches")
-      .select("id,name")
+      .select("id,name,radius_meters")
       .eq("is_active", true)
       .order("name")
 
-    if (error) {
+    if (legacy.error) {
       throw error
     }
 
-    return data ?? []
+    return (legacy.data ?? []).map((branch) => ({
+      id: branch.id,
+      name: branch.name,
+      radius: branch.radius_meters,
+    }))
   }
 }

@@ -1,117 +1,78 @@
 import type { AuthContext } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
-import { calculateDistance } from "@/src/services/geo.service"
-import {
-  BadRequestError,
-  ConflictError,
-  ForbiddenError,
-} from "@/src/utils/errors"
-import { AttendanceCheckInSchema } from "./attendance.schema"
+import { ForbiddenError } from "@/src/utils/errors"
+import { z } from "zod"
 
-const MAX_RADIUS_METERS = 150
-const MAX_TIMESTAMP_SKEW_MS = 2 * 60 * 1000
-
-interface MemberRecord {
-  id: number
-  user_id: string
-  branch_id?: string | null
-  status: string
-}
-
-interface GymBranchRecord {
-  id: string
-  name: string
-  latitude: number
-  longitude: number
-  radius_meters: number
-  is_active: boolean
-}
+const CheckInSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number()
+})
 
 export class AttendanceService {
   constructor(private readonly ctx: AuthContext) {}
 
-  async checkIn(rawInput: unknown, requestId: string) {
+  /**
+   * Hardened Check-in/out:
+   * Uses the database RPC 'mark_gym_attendance' which enforces
+   * proximity, active membership, and daily session logic.
+   */
+  async checkIn(rawInput: unknown, _requestId?: string) {
     requireRole(this.ctx, ["client"])
+    const input = CheckInSchema.parse(rawInput)
 
-    const input = AttendanceCheckInSchema.parse(rawInput)
-
-    if (input.clientTimestamp) {
-      const skew = Math.abs(Date.now() - new Date(input.clientTimestamp).getTime())
-      if (skew > MAX_TIMESTAMP_SKEW_MS) {
-        throw new BadRequestError("Stale attendance request")
+    const { data, error } = await this.ctx.supabase.rpc(
+      "mark_gym_attendance",
+      {
+        lat: input.latitude,
+        lon: input.longitude
       }
-    }
-
-    const member = await this.getActiveMember()
-    const branch = await this.getActiveBranch(member.branch_id ?? null)
-    const distance = calculateDistance(
-      input.latitude,
-      input.longitude,
-      branch.latitude,
-      branch.longitude
     )
-    const allowedRadius = Math.min(branch.radius_meters, MAX_RADIUS_METERS)
-
-    if (distance > allowedRadius) {
-      throw new ForbiddenError("User not within gym radius")
-    }
-
-    const { data, error } = await this.ctx.supabase.rpc("check_in_attendance", {
-      p_branch_id: branch.id,
-      p_latitude: input.latitude,
-      p_longitude: input.longitude,
-      p_request_id: requestId,
-    })
 
     if (error) {
-      if (error.message.includes("already marked")) {
-        throw new ConflictError("Attendance already marked for today")
-      }
-
-      if (error.message.includes("gym radius")) {
-        throw new ForbiddenError("User not within gym radius")
-      }
-
-      throw error
+      throw this.normalizeCheckInError(error)
     }
 
     return data
   }
 
-  private async getActiveMember() {
+  /**
+   * Monthly Attendance History:
+   * Fetches all logs for a specific user and month.
+   */
+  async getHistory(year: number, month: number) {
+    const userId = this.ctx.user.id
+    const startDate = `${year}-${month.toString().padStart(2, "0")}-01`
+    const endDate = new Date(year, month, 0).toISOString().split("T")[0]
+
     const { data, error } = await this.ctx.supabase
-      .from("members")
-      .select("*")
-      .eq("user_id", this.ctx.authUserId)
-      .eq("status", "active")
-      .single<MemberRecord>()
+      .from("attendance")
+      .select("date, status, check_in_time, check_out_time")
+      .eq("user_id", userId)
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .order("date", { ascending: true })
 
-    if (error || !data) {
-      throw new ForbiddenError("Active member profile required")
-    }
-
-    return data
+    if (error) throw error
+    return data || []
   }
 
-  private async getActiveBranch(branchId: string | null) {
-    let query = this.ctx.supabase
-      .from("gym_branches")
-      .select("id,name,latitude,longitude,radius_meters,is_active")
-      .eq("is_active", true)
-
-    if (branchId) {
-      query = query.eq("id", branchId)
+  private normalizeCheckInError(error: any) {
+    const message = error.message || "Attendance failed"
+    
+    // Convert SQL exceptions to human-readable errors
+    if (message.includes("Too far from gym")) {
+      return new ForbiddenError(message)
+    }
+    if (message.includes("Active membership required")) {
+      return new ForbiddenError("Your membership is not active or has expired.")
+    }
+    if (message.includes("already completed")) {
+      return new ForbiddenError("You have already checked out for today.")
+    }
+    if (message.includes("already marked")) {
+      return new ForbiddenError("Attendance already marked for today.")
     }
 
-    const { data, error } = await query
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle<GymBranchRecord>()
-
-    if (error || !data) {
-      throw new BadRequestError("Gym branch not configured")
-    }
-
-    return data
+    return error
   }
 }

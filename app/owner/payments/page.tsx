@@ -1,257 +1,267 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import {
-  PageIntro,
-  SurfaceCard,
-  SearchToolbar,
-  PaginationControls,
-  StatusPill,
-} from '@/components/powerhouse';
-import { Button } from '@/components/ui/button';
-import {
-  DollarSign,
-  Download,
-  Filter,
-  TrendingUp,
-  Calendar,
-} from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { CheckCircle, Clock, Loader2, XCircle, Eye, Smartphone, Banknote, History } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
+import { cn } from "@/lib/utils"
 
-const paymentData = [
-  { date: 'Mon', amount: 12500 },
-  { date: 'Tue', amount: 15200 },
-  { date: 'Wed', amount: 11800 },
-  { date: 'Thu', amount: 18600 },
-  { date: 'Fri', amount: 21400 },
-  { date: 'Sat', amount: 19500 },
-  { date: 'Sun', amount: 14200 },
-];
+interface OwnerPaymentRow {
+  id: string
+  memberName: string
+  amount: number | string
+  planDuration: number
+  status: string
+  paymentMode: "upi" | "cash"
+  screenshotUrl?: string
+  createdAt: string
+  approvedAt?: string | null
+}
 
-const TRANSACTIONS = [
-  {
-    id: '1',
-    member: 'Rajesh Kumar',
-    type: 'Membership',
-    amount: 2500,
-    date: 'Today 10:30 AM',
-    status: 'completed',
-    method: 'Credit Card',
-  },
-  {
-    id: '2',
-    member: 'Priya Singh',
-    type: 'Personal Training',
-    amount: 5000,
-    date: 'Today 9:15 AM',
-    status: 'completed',
-    method: 'Net Banking',
-  },
-  {
-    id: '3',
-    member: 'Amit Patel',
-    type: 'Membership',
-    amount: 2500,
-    date: 'Yesterday 4:20 PM',
-    status: 'pending',
-    method: 'UPI',
-  },
-  {
-    id: '4',
-    member: 'Sarah Khan',
-    type: 'Group Classes',
-    amount: 1500,
-    date: 'Yesterday 2:45 PM',
-    status: 'completed',
-    method: 'Credit Card',
-  },
-  {
-    id: '5',
-    member: 'Vikram Desai',
-    type: 'Membership Renewal',
-    amount: 2500,
-    date: '3 days ago',
-    status: 'completed',
-    method: 'Net Banking',
-  },
-  {
-    id: '6',
-    member: 'Neha Gupta',
-    type: 'Personal Training',
-    amount: 3500,
-    date: '4 days ago',
-    status: 'failed',
-    method: 'Credit Card',
-  },
-];
+interface OwnerPaymentsData {
+  pending: OwnerPaymentRow[]
+  history: OwnerPaymentRow[]
+}
+
+function formatCurrency(value: number | string) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(Number(value))
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value))
+}
 
 export default function OwnerPaymentsPage() {
-  const [search, setSearch] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [data, setData] = useState<OwnerPaymentsData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
 
-  const filteredTransactions = TRANSACTIONS.filter(
-    (tx) =>
-      tx.member.toLowerCase().includes(search.toLowerCase()) ||
-      tx.type.toLowerCase().includes(search.toLowerCase()) ||
-      tx.method.toLowerCase().includes(search.toLowerCase())
-  );
+  const totals = useMemo(() => {
+    const pending = data?.pending ?? []
+    const history = data?.history ?? []
 
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedTransactions = filteredTransactions.slice(
-    startIdx,
-    startIdx + itemsPerPage
-  );
+    return {
+      pendingAmount: pending.reduce(
+        (sum, payment) => sum + Number(payment.amount),
+        0
+      ),
+      approvedAmount: history
+        .filter((payment) => payment.status === "approved")
+        .reduce((sum, payment) => sum + Number(payment.amount), 0),
+    }
+  }, [data])
 
-  const totalRevenue = TRANSACTIONS.filter(
-    (tx) => tx.status === 'completed'
-  ).reduce((sum, tx) => sum + tx.amount, 0);
+  async function loadPayments() {
+    try {
+      const response = await fetch("/api/owner/payments", {
+        credentials: "include",
+        cache: "no-store",
+      })
+      const result = await response.json()
 
-  const pendingAmount = TRANSACTIONS.filter(
-    (tx) => tx.status === 'pending'
-  ).reduce((sum, tx) => sum + tx.amount, 0);
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Unable to load payments")
+      }
+
+      setData(result.data)
+    } catch (error: any) {
+      toast.error("Load failed", { description: error.message })
+    }
+  }
+
+  useEffect(() => {
+    loadPayments().finally(() => setIsLoading(false))
+  }, [])
+
+  async function reviewPayment(id: string, status: "approved" | "rejected") {
+    setUpdatingId(id)
+
+    try {
+      const response = await fetch("/api/owner/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ id, status }),
+      })
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Unable to update payment")
+      }
+
+      toast.success(status === "approved" ? "Payment approved" : "Payment rejected")
+      await loadPayments()
+    } catch (error: any) {
+      toast.error("Update failed", { description: error.message })
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
-        <PageIntro
-          title="Payments"
-          description="Track revenue and manage all transactions"
-        />
+    <div className="space-y-6 pb-20">
+      <PageIntro
+        title="Revenue & Approvals"
+        subtitle="Verify manual payment requests and digital UPI receipts"
+      />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <SurfaceCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Total Revenue</p>
-                <p className="text-3xl font-bold text-accent">₹{totalRevenue}</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-accent opacity-50" />
-            </div>
-          </SurfaceCard>
-          <SurfaceCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Pending Payments
-                </p>
-                <p className="text-3xl font-bold text-orange-500">₹{pendingAmount}</p>
-              </div>
-              <Calendar className="w-8 h-8 text-orange-500 opacity-50" />
-            </div>
-          </SurfaceCard>
-          <SurfaceCard>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Transactions
-                </p>
-                <p className="text-3xl font-bold text-foreground">
-                  {TRANSACTIONS.length}
-                </p>
-              </div>
-              <DollarSign className="w-8 h-8 text-accent opacity-50" />
-            </div>
-          </SurfaceCard>
-        </div>
-
-        {/* Chart */}
-        <SurfaceCard className="mb-6">
-          <h3 className="text-lg font-semibold text-foreground mb-4">
-            Weekly Revenue Breakdown
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={paymentData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#666" />
-              <YAxis stroke="#666" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #333',
-                }}
-              />
-              <Bar dataKey="amount" fill="#ef4444" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid gap-4 md:grid-cols-3">
+        <SurfaceCard className="border-l-4 border-l-primary">
+          <Clock className="mb-3 h-5 w-5 text-primary" />
+          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Pending Requests</p>
+          <p className="mt-1 text-2xl font-bold text-foreground tabular-nums">
+            {data?.pending.length ?? 0}
+          </p>
         </SurfaceCard>
-
-        {/* Transactions Table */}
-        <SurfaceCard className="mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
-            <SearchToolbar
-              value={search}
-              onChange={setSearch}
-              placeholder="Search by member, type, or method..."
-            />
-            <div className="flex gap-2 w-full md:w-auto">
-              <Button
-                variant="outline"
-                className="flex-1 md:flex-none border-border"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 md:flex-none border-border"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </div>
-          </div>
-
-          {/* Table */}
-          <div className="space-y-2">
-            {paginatedTransactions.map((tx) => (
-              <div
-                key={tx.id}
-                className="grid grid-cols-2 md:grid-cols-6 gap-4 p-4 rounded-lg bg-background border border-border items-center text-sm"
-              >
-                <div className="col-span-2 md:col-span-1">
-                  <p className="font-medium text-foreground text-xs md:text-sm">
-                    {tx.member}
-                  </p>
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-muted-foreground text-xs">{tx.type}</p>
-                </div>
-                <div className="hidden md:block">
-                  <p className="text-muted-foreground text-xs">{tx.method}</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-accent">₹{tx.amount}</p>
-                </div>
-                <div className="flex items-center justify-between md:justify-end gap-2">
-                  <p className="text-muted-foreground text-xs">{tx.date}</p>
-                  <StatusPill status={tx.status} size="sm" />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredTransactions.length > itemsPerPage && (
-            <div className="mt-6">
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
+        <SurfaceCard className="border-l-4 border-l-emerald-500">
+          <CheckCircle className="mb-3 h-5 w-5 text-emerald-500" />
+          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Approved Revenue</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-500 tabular-nums">
+            {formatCurrency(totals.approvedAmount)}
+          </p>
+        </SurfaceCard>
+        <SurfaceCard className="border-l-4 border-l-amber-500">
+          <Clock className="mb-3 h-5 w-5 text-amber-500" />
+          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Pending Amount</p>
+          <p className="mt-1 text-2xl font-bold text-amber-500 tabular-nums">
+            {formatCurrency(totals.pendingAmount)}
+          </p>
         </SurfaceCard>
       </div>
+
+      {isLoading ? (
+        <SurfaceCard>
+          <div className="flex min-h-40 items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        </SurfaceCard>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Pending Section */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <Clock className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Pending Approval</h2>
+            </div>
+            
+            {data?.pending.length ? (
+              <div className="space-y-3">
+                {data.pending.map((payment) => (
+                  <SurfaceCard key={payment.id} className="p-4 group">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div>
+                        <p className="font-bold text-lg text-foreground leading-tight">{payment.memberName}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={cn(
+                            "px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter flex items-center gap-1",
+                            payment.paymentMode === "upi" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                          )}>
+                            {payment.paymentMode === "upi" ? <Smartphone className="h-3 w-3" /> : <Banknote className="h-3 w-3" />}
+                            {payment.paymentMode}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {payment.planDuration} Day Plan
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xl font-black text-foreground">{formatCurrency(payment.amount)}</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">{formatDate(payment.createdAt)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-border/50">
+                      {payment.screenshotUrl && (
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="h-9 px-4 font-bold text-xs gap-2"
+                          asChild
+                        >
+                          <a href={payment.screenshotUrl} target="_blank" rel="noreferrer">
+                            <Eye className="h-4 w-4" />
+                            View Proof
+                          </a>
+                        </Button>
+                      )}
+                      <div className="flex-1" />
+                      <Button
+                        size="sm"
+                        className="h-9 px-4 font-bold text-xs gap-2 bg-emerald-500 hover:bg-emerald-600 text-white"
+                        onClick={() => reviewPayment(payment.id, "approved")}
+                        disabled={!!updatingId}
+                      >
+                        {updatingId === payment.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                        Approve
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-9 px-4 font-bold text-xs gap-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                        onClick={() => reviewPayment(payment.id, "rejected")}
+                        disabled={!!updatingId}
+                      >
+                        <XCircle className="h-4 w-4" />
+                        Reject
+                      </Button>
+                    </div>
+                  </SurfaceCard>
+                ))}
+              </div>
+            ) : (
+              <SurfaceCard className="py-12 text-center border-dashed">
+                <p className="text-sm text-muted-foreground">No pending requests at the moment.</p>
+              </SurfaceCard>
+            )}
+          </section>
+
+          {/* History Section */}
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+              <History className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Recent Decisions</h2>
+            </div>
+
+            {data?.history.length ? (
+              <div className="space-y-3">
+                {data.history.map((payment) => (
+                  <div
+                    key={payment.id}
+                    className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card/30 hover:bg-card/50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-bold text-foreground">{payment.memberName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(payment.amount)} • {payment.paymentMode.toUpperCase()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {payment.screenshotUrl && (
+                        <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-secondary/50 text-muted-foreground hover:text-primary transition-colors">
+                          <Eye className="h-4 w-4" />
+                        </a>
+                      )}
+                      <StatusPill status={payment.status} size="sm" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground px-1">
+                Approved and rejected requests will appear here.
+              </p>
+            )}
+          </section>
+        </div>
+      )}
     </div>
-  );
+  )
 }

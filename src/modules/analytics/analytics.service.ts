@@ -1,5 +1,6 @@
 import type { AuthContext } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
+import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import type {
   AnalyticsDateRangeQuery,
   InactiveMembersQuery,
@@ -138,6 +139,32 @@ function isMissingRpcError(error: unknown) {
   )
 }
 
+/** Legacy RPCs reference members.branch_id; fall back to MVP table queries on any RPC failure. */
+function shouldUseTableFallback(error: unknown) {
+  if (!error) return false
+  if (isMissingRpcError(error)) return true
+
+  const rpcError = error as { code?: string; message?: string; details?: string }
+  const text = `${rpcError.message ?? ""} ${rpcError.details ?? ""}`.toLowerCase()
+
+  return (
+    rpcError.code === "42703" ||
+    rpcError.code === "42P01" ||
+    rpcError.code === "42883" ||
+    text.includes("does not exist") ||
+    text.includes("branch_id")
+  )
+}
+
+function withGymFilter(query: any, gymId?: string | null) {
+  return gymId ? query.eq("gym_id", gymId) : query
+}
+
+function paymentBucketDate(payment: { created_at?: string }) {
+  if (payment.created_at) return payment.created_at.slice(0, 10)
+  return todayDate()
+}
+
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10)
 }
@@ -267,7 +294,7 @@ export class AnalyticsService {
     })
 
     if (error) {
-      if (isMissingRpcError(error)) return this.getAttendanceFromTables(query)
+      if (shouldUseTableFallback(error)) return this.getAttendanceFromTables(query)
       throw error
     }
 
@@ -310,9 +337,9 @@ export class AnalyticsService {
     ])
 
     if (
-      isMissingRpcError(weeklyResult.error) ||
-      isMissingRpcError(monthlyResult.error) ||
-      isMissingRpcError(metricsResult.error)
+      shouldUseTableFallback(weeklyResult.error) ||
+      shouldUseTableFallback(monthlyResult.error) ||
+      shouldUseTableFallback(metricsResult.error)
     ) {
       return this.getRevenueFromTables(query)
     }
@@ -359,7 +386,7 @@ export class AnalyticsService {
     })
 
     if (error) {
-      if (isMissingRpcError(error)) return this.getInactiveMembersFromTables(query)
+      if (shouldUseTableFallback(error)) return this.getInactiveMembersFromTables(query)
       throw error
     }
 
@@ -446,44 +473,277 @@ export class AnalyticsService {
 
   async getDashboard(query: AnalyticsDateRangeQuery) {
     requireRole(this.ctx, ["owner"])
+    return this.buildOwnerDashboardMvp(query)
+  }
+
+  /** MVP schema: no legacy RPCs, members table, or payments.date column. */
+  private async buildOwnerDashboardMvp(query: AnalyticsDateRangeQuery) {
+    const admin = createSupabaseServiceRoleClient()
+    const gymId = query.branchId ?? this.ctx.user.gymId ?? null
+    const { from, to } = rangeOrDefault(query)
+    const weekDates = eachDate(from, to)
+    const today = todayDate()
+    const monthStart = currentMonthStart()
+    const inactiveCutoff = daysAgo(7)
 
     const [
-      metrics,
-      attendance,
-      revenue,
-      inactive,
-      recentPayments,
-      pendingRequests,
+      clientsRes,
+      activeMembershipsRes,
+      trainersRes,
+      attendanceRangeRes,
+      paymentsWeekRes,
+      paymentsMonthRes,
+      pendingPaymentsRes,
+      requestsCountRes,
+      recentPaymentsRes,
+      clientsForInactiveRes,
+      attendanceAllRes,
+      pendingRequestsRes,
     ] = await Promise.all([
-      this.getDashboardMetrics(query),
-      this.getAttendance(query),
-      this.getRevenue(query),
-      this.getInactiveMembers({
-        days: 7,
-        limit: 5,
-        offset: 0,
-        branchId: query.branchId,
-      }),
-      this.getRecentPayments(5, query.branchId),
-      this.getPendingRequests(5),
+      withGymFilter(admin.from("users").select("id").eq("role", "client"), gymId),
+      withGymFilter(
+        admin.from("memberships").select("user_id").eq("status", "active"),
+        gymId
+      ),
+      withGymFilter(admin.from("users").select("id").eq("role", "trainer"), gymId),
+      withGymFilter(
+        admin.from("attendance").select("user_id,date").gte("date", from).lte("date", to),
+        gymId
+      ),
+      withGymFilter(
+        admin
+          .from("payments")
+          .select("amount,status,created_at")
+          .gte("created_at", `${from}T00:00:00.000Z`)
+          .lte("created_at", `${to}T23:59:59.999Z`),
+        gymId
+      ),
+      withGymFilter(
+        admin
+          .from("payments")
+          .select("amount,status,created_at")
+          .in("status", ["paid", "approved"])
+          .gte("created_at", `${monthStart}T00:00:00.000Z`),
+        gymId
+      ),
+      withGymFilter(admin.from("payments").select("amount").eq("status", "pending"), gymId),
+      admin.from("requests").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      withGymFilter(
+        admin
+          .from("payments")
+          .select("id,user_id,amount,status,created_at,users(name,email)")
+          .order("created_at", { ascending: false })
+          .limit(5),
+        gymId
+      ),
+      withGymFilter(
+        admin.from("users").select("id,name,email").eq("role", "client"),
+        gymId
+      ),
+      withGymFilter(admin.from("attendance").select("user_id,date"), gymId),
+      admin
+        .from("requests")
+        .select("id,type,data,created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(5),
     ])
+
+    const firstError =
+      clientsRes.error ??
+      activeMembershipsRes.error ??
+      trainersRes.error ??
+      attendanceRangeRes.error ??
+      paymentsWeekRes.error ??
+      paymentsMonthRes.error ??
+      pendingPaymentsRes.error ??
+      requestsCountRes.error ??
+      recentPaymentsRes.error ??
+      clientsForInactiveRes.error ??
+      attendanceAllRes.error ??
+      pendingRequestsRes.error
+
+    if (firstError) throw firstError
+
+    const clients = (clientsRes.data ?? []) as Array<{ id: string }>
+    const attendanceRange = attendanceRangeRes.data ?? []
+
+    const attendanceCounts = new Map(weekDates.map((date) => [date, 0]))
+    for (const row of attendanceRange) {
+      attendanceCounts.set(row.date, (attendanceCounts.get(row.date) ?? 0) + 1)
+    }
+
+    const attendanceTrend = weekDates.map((date) => ({
+      date,
+      checkIns: attendanceCounts.get(date) ?? 0,
+    }))
+    const attendanceTotal = attendanceTrend.reduce((sum, row) => sum + row.checkIns, 0)
+
+    const revenueBuckets = new Map(
+      weekDates.map((date) => [
+        date,
+        { revenue: 0, pendingTotal: 0, paidPayments: 0, pendingPayments: 0 },
+      ])
+    )
+
+    for (const payment of paymentsWeekRes.data ?? []) {
+      const amount = toNumber(payment.amount)
+      const bucketDate = paymentBucketDate(payment)
+      const bucket = revenueBuckets.get(bucketDate)
+      if (!bucket) continue
+
+      if (payment.status === "paid" || payment.status === "approved") {
+        bucket.revenue += amount
+        bucket.paidPayments += 1
+      } else if (payment.status === "pending") {
+        bucket.pendingTotal += amount
+        bucket.pendingPayments += 1
+      }
+    }
+
+    const weekly = [...revenueBuckets.entries()].map(([date, bucket]) => ({
+      date,
+      revenue: bucket.revenue,
+      pendingTotal: bucket.pendingTotal,
+      paidPayments: bucket.paidPayments,
+      pendingPayments: bucket.pendingPayments,
+    }))
+
+    const weeklyRevenue = weekly.reduce((sum, day) => sum + day.revenue, 0)
+    const monthPayments = (paymentsMonthRes.data ?? []) as Array<{
+      amount: number | string
+    }>
+    const pendingPayments = (pendingPaymentsRes.data ?? []) as Array<{
+      amount: number | string
+    }>
+    const monthlyRevenue = monthPayments.reduce(
+      (sum, payment) => sum + toNumber(payment.amount),
+      0
+    )
+    const pendingPaymentsTotal = pendingPayments.reduce(
+      (sum, payment) => sum + toNumber(payment.amount),
+      0
+    )
+
+    const allAttendance = (attendanceAllRes.data ?? []) as Array<{
+      user_id: string | null
+      date: string
+    }>
+
+    const lastAttendance = new Map<string, string>()
+    for (const row of allAttendance) {
+      if (!row.user_id) continue
+      const existing = lastAttendance.get(row.user_id)
+      if (!existing || row.date > existing) lastAttendance.set(row.user_id, row.date)
+    }
+
+    const inactiveList = (
+      (clientsForInactiveRes.data ?? []) as Array<{
+        id: string
+        name: string | null
+        email: string | null
+      }>
+    )
+      .map((client) => {
+        const lastAttendanceDate = lastAttendance.get(client.id) ?? null
+        return {
+          client,
+          lastAttendanceDate,
+          isInactive: !lastAttendanceDate || lastAttendanceDate < inactiveCutoff,
+        }
+      })
+      .filter((item) => item.isInactive)
+
+    const activeLastWeek = new Set(
+      allAttendance
+        .filter((row) => row.date >= inactiveCutoff && row.user_id)
+        .map((row) => row.user_id as string)
+    )
+
+    const recentPayments = (
+      (recentPaymentsRes.data ?? []) as Array<{
+        id: string | number
+        user_id?: string
+        amount: number | string
+        status: string
+        created_at: string
+        users?: unknown
+      }>
+    ).map((payment) => {
+      const user = firstRecord(payment.users)
+      return {
+        id: String(payment.id),
+        memberId: payment.user_id ?? "",
+        memberName:
+          stringField(user, "name") ??
+          stringField(user, "email") ??
+          "Member",
+        amount: toNumber(payment.amount),
+        status: payment.status,
+        paymentDate: paymentBucketDate(payment),
+        createdAt: payment.created_at,
+      }
+    })
+
+    const pendingRequests = ((pendingRequestsRes.data ?? []) as LegacyRequestRow[]).map(
+      (request) => ({
+        id: request.id,
+        name: requestDisplayName(request),
+        type: request.type,
+        createdAt: request.created_at,
+      })
+    )
 
     return {
       metrics: {
-        totalMembers: Number(metrics.totalMembers ?? 0),
-        activeMembers: Number(metrics.activeMembers ?? 0),
-        activeTrainers: Number(metrics.activeTrainers ?? 0),
-        weeklyRevenue: toNumber(metrics.weeklyRevenue),
-        monthlyRevenue: toNumber(metrics.monthlyRevenue),
-        pendingPaymentsTotal: toNumber(metrics.pendingPaymentsTotal),
-        avgDailyAttendance: toNumber(metrics.avgDailyAttendance),
-        attendanceToday: Number(metrics.attendanceToday ?? 0),
-        inactiveMembers: Number(metrics.inactiveMembers ?? 0),
-        pendingRequests: Number(metrics.pendingRequests ?? 0),
+        totalMembers: clients.length,
+        activeMembers: (activeMembershipsRes.data ?? []).length,
+        activeTrainers: (trainersRes.data ?? []).length,
+        weeklyRevenue,
+        monthlyRevenue,
+        pendingPaymentsTotal,
+        avgDailyAttendance:
+          weekDates.length > 0
+            ? Number((attendanceTotal / weekDates.length).toFixed(2))
+            : 0,
+        attendanceToday: attendanceCounts.get(today) ?? 0,
+        inactiveMembers: clients.filter((client) => !activeLastWeek.has(client.id)).length,
+        pendingRequests: requestsCountRes.count ?? 0,
       },
-      attendance,
-      revenue,
-      inactive,
+      attendance: {
+        trend: attendanceTrend,
+        total: attendanceTotal,
+        average:
+          weekDates.length > 0
+            ? Number((attendanceTotal / weekDates.length).toFixed(2))
+            : 0,
+      },
+      revenue: {
+        weekly,
+        monthly: [],
+        weeklyRevenue,
+        monthlyRevenue,
+        pendingPaymentsTotal,
+      },
+      inactive: {
+        count: inactiveList.length,
+        members: inactiveList.slice(0, 5).map(({ client, lastAttendanceDate }) => ({
+          memberId: client.id,
+          userId: client.id,
+          fullName: client.name ?? client.email ?? "Member",
+          email: client.email,
+          branchId: gymId,
+          lastAttendanceDate,
+          inactiveDays: lastAttendanceDate
+            ? Math.floor(
+                (Date.now() -
+                  new Date(`${lastAttendanceDate}T00:00:00.000Z`).getTime()) /
+                  DAY_MS
+              )
+            : null,
+        })),
+        pagination: { limit: 5, offset: 0 },
+      },
       recentPayments,
       pendingRequests,
     }
@@ -495,7 +755,9 @@ export class AnalyticsService {
     })
 
     if (error) {
-      if (isMissingRpcError(error)) return this.getDashboardMetricsFromTables()
+      if (shouldUseTableFallback(error)) {
+        return this.getDashboardMetricsFromTables(query.branchId)
+      }
       throw error
     }
 
@@ -509,8 +771,8 @@ export class AnalyticsService {
     })
 
     if (error) {
-      if (isMissingRpcError(error)) {
-        return this.getRecentPaymentsFromTables(limit)
+      if (shouldUseTableFallback(error)) {
+        return this.getRecentPaymentsFromTables(limit, branchId)
       }
       throw error
     }
@@ -532,7 +794,7 @@ export class AnalyticsService {
     })
 
     if (error) {
-      if (isMissingRpcError(error)) return this.getPendingRequestsFromTables(limit)
+      if (shouldUseTableFallback(error)) return this.getPendingRequestsFromTables(limit)
       throw error
     }
 
@@ -546,11 +808,14 @@ export class AnalyticsService {
 
   private async getAttendanceFromTables(query: AnalyticsDateRangeQuery) {
     const { from, to } = rangeOrDefault(query)
-    const { data, error } = await this.ctx.supabase
-      .from("attendance")
-      .select("date")
-      .gte("date", from)
-      .lte("date", to)
+    const { data, error } = await withGymFilter(
+      this.ctx.supabase
+        .from("attendance")
+        .select("date")
+        .gte("date", from)
+        .lte("date", to),
+      query.branchId
+    )
 
     if (error) throw error
 
@@ -580,15 +845,18 @@ export class AnalyticsService {
     const monthlyFrom = monthStarts[0] ?? currentMonthStart()
 
     const [paymentsResult, pendingResult] = await Promise.all([
-      this.ctx.supabase
-        .from("payments")
-        .select("amount,status,date")
-        .gte("date", monthlyFrom)
-        .lte("date", todayDate()),
-      this.ctx.supabase
-        .from("payments")
-        .select("amount")
-        .eq("status", "pending"),
+      withGymFilter(
+        this.ctx.supabase
+          .from("payments")
+          .select("amount,status,created_at")
+          .gte("created_at", `${monthlyFrom}T00:00:00.000Z`)
+          .lte("created_at", `${todayDate()}T23:59:59.999Z`),
+        query.branchId
+      ),
+      withGymFilter(
+        this.ctx.supabase.from("payments").select("amount").eq("status", "pending"),
+        query.branchId
+      ),
     ])
 
     if (paymentsResult.error) throw paymentsResult.error
@@ -596,7 +864,7 @@ export class AnalyticsService {
 
     const payments = (paymentsResult.data ?? []) as Pick<
       LegacyPaymentRow,
-      "amount" | "status" | "date"
+      "amount" | "status" | "created_at"
     >[]
     const pendingPaymentsTotal = ((pendingResult.data ?? []) as Pick<
       LegacyPaymentRow,
@@ -626,10 +894,11 @@ export class AnalyticsService {
 
     for (const payment of payments) {
       const amount = toNumber(payment.amount)
-      const weeklyBucket = weeklyBuckets.get(payment.date)
+      const bucketDate = paymentBucketDate(payment)
+      const weeklyBucket = weeklyBuckets.get(bucketDate)
 
       if (weeklyBucket) {
-        if (payment.status === "paid") {
+        if (payment.status === "paid" || payment.status === "approved") {
           weeklyBucket.revenue += amount
           weeklyBucket.paidPayments += 1
         }
@@ -640,9 +909,11 @@ export class AnalyticsService {
         }
       }
 
-      const monthlyBucket = monthlyBuckets.get(monthStartFor(payment.date))
+      const monthlyBucket = monthlyBuckets.get(monthStartFor(bucketDate))
       if (monthlyBucket) {
-        if (payment.status === "paid") monthlyBucket.revenue += amount
+        if (payment.status === "paid" || payment.status === "approved") {
+          monthlyBucket.revenue += amount
+        }
         if (payment.status === "pending") monthlyBucket.pendingTotal += amount
       }
     }
@@ -673,33 +944,42 @@ export class AnalyticsService {
 
   private async getInactiveMembersFromTables(query: InactiveMembersQuery) {
     const cutoff = daysAgo(query.days)
-    const [membersResult, attendanceResult] = await Promise.all([
-      this.ctx.supabase
-        .from("members")
-        .select("id,user_id,status,users(name,email)")
-        .order("id", { ascending: true }),
-      this.ctx.supabase.from("attendance").select("member_id,date"),
+    const [clientsResult, attendanceResult] = await Promise.all([
+      withGymFilter(
+        this.ctx.supabase
+          .from("users")
+          .select("id,name,email")
+          .eq("role", "client")
+          .order("name", { ascending: true }),
+        query.branchId
+      ),
+      withGymFilter(
+        this.ctx.supabase.from("attendance").select("user_id,date"),
+        query.branchId
+      ),
     ])
 
-    if (membersResult.error) throw membersResult.error
+    if (clientsResult.error) throw clientsResult.error
     if (attendanceResult.error) throw attendanceResult.error
 
     const lastAttendance = new Map<string, string>()
 
-    for (const row of (attendanceResult.data ?? []) as Pick<
-      LegacyAttendanceRow,
-      "member_id" | "date"
-    >[]) {
-      const memberId = String(row.member_id)
-      const existing = lastAttendance.get(memberId)
-      if (!existing || row.date > existing) lastAttendance.set(memberId, row.date)
+    for (const row of (attendanceResult.data ?? []) as Array<{
+      user_id: string
+      date: string
+    }>) {
+      if (!row.user_id) continue
+      const existing = lastAttendance.get(row.user_id)
+      if (!existing || row.date > existing) lastAttendance.set(row.user_id, row.date)
     }
 
-    const inactive = ((membersResult.data ?? []) as LegacyMemberRow[])
-      .map((member) => {
-        const lastAttendanceDate = lastAttendance.get(String(member.id)) ?? null
+    const inactive = (
+      (clientsResult.data ?? []) as Array<{ id: string; name: string | null; email: string | null }>
+    )
+      .map((client) => {
+        const lastAttendanceDate = lastAttendance.get(client.id) ?? null
         return {
-          member,
+          client,
           lastAttendanceDate,
           isInactive: !lastAttendanceDate || lastAttendanceDate < cutoff,
         }
@@ -710,12 +990,12 @@ export class AnalyticsService {
       count: inactive.length,
       members: inactive
         .slice(query.offset, query.offset + query.limit)
-        .map(({ member, lastAttendanceDate }) => ({
-          memberId: String(member.id),
-          userId: member.user_id,
-          fullName: memberDisplayName(member),
-          email: stringField(firstRecord(member.users), "email"),
-          branchId: null,
+        .map(({ client, lastAttendanceDate }) => ({
+          memberId: client.id,
+          userId: client.id,
+          fullName: client.name ?? client.email ?? "Member",
+          email: client.email,
+          branchId: query.branchId ?? null,
           lastAttendanceDate,
           inactiveDays: lastAttendanceDate
             ? Math.floor(
@@ -732,14 +1012,17 @@ export class AnalyticsService {
     }
   }
 
-  private async getDashboardMetricsFromTables(): Promise<DashboardMetrics> {
+  private async getDashboardMetricsFromTables(
+    gymId?: string | null
+  ): Promise<DashboardMetrics> {
     const weekStart = daysAgo(6)
     const monthStart = currentMonthStart()
     const today = todayDate()
     const inactiveCutoff = daysAgo(7)
 
     const [
-      membersResult,
+      clientsResult,
+      activeMembershipsResult,
       trainersResult,
       attendanceResult,
       weeklyPaymentsResult,
@@ -747,31 +1030,54 @@ export class AnalyticsService {
       pendingPaymentsResult,
       requestsResult,
     ] = await Promise.all([
-      this.ctx.supabase.from("members").select("id,status"),
-      this.ctx.supabase.from("trainers").select("id"),
-      this.ctx.supabase
-        .from("attendance")
-        .select("member_id,date")
-        .gte("date", weekStart)
-        .lte("date", today),
-      this.ctx.supabase
-        .from("payments")
-        .select("amount,status,date")
-        .eq("status", "paid")
-        .gte("date", weekStart),
-      this.ctx.supabase
-        .from("payments")
-        .select("amount,status,date")
-        .eq("status", "paid")
-        .gte("date", monthStart),
-      this.ctx.supabase
-        .from("payments")
-        .select("amount")
-        .eq("status", "pending"),
+      withGymFilter(
+        this.ctx.supabase.from("users").select("id").eq("role", "client"),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase
+          .from("memberships")
+          .select("user_id")
+          .eq("status", "active"),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase.from("users").select("id").eq("role", "trainer"),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase
+          .from("attendance")
+          .select("user_id,date")
+          .gte("date", weekStart)
+          .lte("date", today),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase
+          .from("payments")
+          .select("amount,status,created_at")
+          .in("status", ["paid", "approved"])
+          .gte("created_at", `${weekStart}T00:00:00.000Z`),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase
+          .from("payments")
+          .select("amount,status,created_at")
+          .in("status", ["paid", "approved"])
+          .gte("created_at", `${monthStart}T00:00:00.000Z`),
+        gymId
+      ),
+      withGymFilter(
+        this.ctx.supabase.from("payments").select("amount").eq("status", "pending"),
+        gymId
+      ),
       this.ctx.supabase.from("requests").select("id").eq("status", "pending"),
     ])
 
-    if (membersResult.error) throw membersResult.error
+    if (clientsResult.error) throw clientsResult.error
+    if (activeMembershipsResult.error) throw activeMembershipsResult.error
     if (trainersResult.error) throw trainersResult.error
     if (attendanceResult.error) throw attendanceResult.error
     if (weeklyPaymentsResult.error) throw weeklyPaymentsResult.error
@@ -779,18 +1085,15 @@ export class AnalyticsService {
     if (pendingPaymentsResult.error) throw pendingPaymentsResult.error
     if (requestsResult.error) throw requestsResult.error
 
-    const members = (membersResult.data ?? []) as Pick<
-      LegacyMemberRow,
-      "id" | "status"
-    >[]
-    const attendance = (attendanceResult.data ?? []) as Pick<
-      LegacyAttendanceRow,
-      "member_id" | "date"
-    >[]
+    const clients = (clientsResult.data ?? []) as Array<{ id: string }>
+    const attendance = (attendanceResult.data ?? []) as Array<{
+      user_id: string | null
+      date: string
+    }>
     const activeLastWeek = new Set(
       attendance
-        .filter((row) => row.date >= inactiveCutoff)
-        .map((row) => String(row.member_id))
+        .filter((row) => row.date >= inactiveCutoff && row.user_id)
+        .map((row) => row.user_id as string)
     )
     const attendanceByDate = new Map(eachDate(weekStart, today).map((date) => [date, 0]))
 
@@ -798,22 +1101,17 @@ export class AnalyticsService {
       attendanceByDate.set(row.date, (attendanceByDate.get(row.date) ?? 0) + 1)
     }
 
+    const sumPayments = (
+      rows: Array<{ amount: number | string }> | null | undefined
+    ) => (rows ?? []).reduce((sum, payment) => sum + toNumber(payment.amount), 0)
+
     return {
-      totalMembers: members.length,
-      activeMembers: members.filter((member) => member.status === "active").length,
+      totalMembers: clients.length,
+      activeMembers: (activeMembershipsResult.data ?? []).length,
       activeTrainers: (trainersResult.data ?? []).length,
-      weeklyRevenue: ((weeklyPaymentsResult.data ?? []) as Pick<
-        LegacyPaymentRow,
-        "amount"
-      >[]).reduce((sum, payment) => sum + toNumber(payment.amount), 0),
-      monthlyRevenue: ((monthlyPaymentsResult.data ?? []) as Pick<
-        LegacyPaymentRow,
-        "amount"
-      >[]).reduce((sum, payment) => sum + toNumber(payment.amount), 0),
-      pendingPaymentsTotal: ((pendingPaymentsResult.data ?? []) as Pick<
-        LegacyPaymentRow,
-        "amount"
-      >[]).reduce((sum, payment) => sum + toNumber(payment.amount), 0),
+      weeklyRevenue: sumPayments(weeklyPaymentsResult.data),
+      monthlyRevenue: sumPayments(monthlyPaymentsResult.data),
+      pendingPaymentsTotal: sumPayments(pendingPaymentsResult.data),
       avgDailyAttendance: Number(
         (
           [...attendanceByDate.values()].reduce((sum, count) => sum + count, 0) /
@@ -821,29 +1119,33 @@ export class AnalyticsService {
         ).toFixed(2)
       ),
       attendanceToday: attendanceByDate.get(today) ?? 0,
-      inactiveMembers: members.filter(
-        (member) => !activeLastWeek.has(String(member.id))
-      ).length,
+      inactiveMembers: clients.filter((client) => !activeLastWeek.has(client.id)).length,
       pendingRequests: (requestsResult.data ?? []).length,
     }
   }
 
-  private async getRecentPaymentsFromTables(limit: number) {
-    const nestedResult = await this.ctx.supabase
-      .from("payments")
-      .select("id,member_id,amount,status,date,created_at,members(users(name,email))")
-      .order("created_at", { ascending: false })
-      .limit(limit)
+  private async getRecentPaymentsFromTables(limit: number, gymId?: string | null) {
+    const nestedResult = await withGymFilter(
+      this.ctx.supabase
+        .from("payments")
+        .select("id,user_id,member_id,amount,status,created_at,users(name,email)")
+        .order("created_at", { ascending: false })
+        .limit(limit),
+      gymId
+    )
 
     let data = nestedResult.data as unknown[] | null
     let error = nestedResult.error
 
     if (error) {
-      const plainResult = await this.ctx.supabase
-        .from("payments")
-        .select("id,member_id,amount,status,date,created_at")
-        .order("created_at", { ascending: false })
-        .limit(limit)
+      const plainResult = await withGymFilter(
+        this.ctx.supabase
+          .from("payments")
+          .select("id,user_id,member_id,amount,status,created_at")
+          .order("created_at", { ascending: false })
+          .limit(limit),
+        gymId
+      )
 
       data = plainResult.data as unknown[] | null
       error = plainResult.error
@@ -851,15 +1153,25 @@ export class AnalyticsService {
 
     if (error) throw error
 
-    return ((data ?? []) as LegacyPaymentRow[]).map((payment) => ({
-      id: String(payment.id),
-      memberId: String(payment.member_id),
-      memberName: paymentMemberName(payment),
-      amount: toNumber(payment.amount),
-      status: payment.status,
-      paymentDate: payment.date,
-      createdAt: payment.created_at,
-    }))
+    return ((data ?? []) as Array<
+      LegacyPaymentRow & { user_id?: string; users?: unknown }
+    >).map((payment) => {
+      const user = firstRecord(payment.users)
+      const memberName =
+        stringField(user, "name") ??
+        stringField(user, "email") ??
+        paymentMemberName(payment)
+
+      return {
+        id: String(payment.id),
+        memberId: String(payment.user_id ?? payment.member_id),
+        memberName,
+        amount: toNumber(payment.amount),
+        status: payment.status,
+        paymentDate: paymentBucketDate(payment),
+        createdAt: payment.created_at,
+      }
+    })
   }
 
   private async getPendingRequestsFromTables(limit: number) {

@@ -14,8 +14,8 @@ import {
 import { LogOut, User, Settings, Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UserRole } from "./types"
-import { useState } from "react"
 import { BrandLogo } from "@/components/brand-logo"
+import { useTheme } from "next-themes"
 
 interface TopHeaderProps {
   role: UserRole
@@ -30,9 +30,16 @@ const roleLabels: Record<UserRole, string> = {
   client: "Member",
 }
 
+const settingsPath: Record<UserRole, string> = {
+  owner: "/owner/settings",
+  trainer: "/trainer/settings",
+  client: "/client/settings",
+}
+
 export function TopHeader({ role, userName, userAvatar, className }: TopHeaderProps) {
   const router = useRouter()
-  const [isDark, setIsDark] = useState(true)
+  const { resolvedTheme, setTheme } = useTheme()
+  const isDark = resolvedTheme !== "light"
 
   const initials = userName
     .split(" ")
@@ -50,8 +57,7 @@ export function TopHeader({ role, userName, userAvatar, className }: TopHeaderPr
   }
 
   const toggleTheme = () => {
-    setIsDark(!isDark)
-    // Theme toggle logic would go here
+    setTheme(isDark ? "light" : "dark")
   }
 
   return (
@@ -111,13 +117,16 @@ export function TopHeader({ role, userName, userAvatar, className }: TopHeaderPr
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => router.push(`/${role}/profile`)}
+              onClick={() => router.push(settingsPath[role])}
               className="cursor-pointer"
             >
               <User className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="cursor-pointer">
+            <DropdownMenuItem
+              onClick={() => router.push(settingsPath[role])}
+              className="cursor-pointer"
+            >
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </DropdownMenuItem>

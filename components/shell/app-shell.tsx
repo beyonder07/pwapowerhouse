@@ -36,8 +36,6 @@ export function AppShell({
   userAvatar,
   pendingCount,
   footerItems,
-  sidebarOpen,
-  setSidebarOpen,
 }: AppShellProps) {
   const finalUserName = user?.name || userName || "User"
   const finalUserAvatar = user?.avatar || userAvatar
@@ -57,7 +55,7 @@ export function AppShell({
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Top Header */}
         <TopHeader
           role={role}
@@ -66,13 +64,8 @@ export function AppShell({
         />
 
         {/* Content */}
-        <main
-          className={cn(
-            "main-content flex-1",
-            "mobile-main-safe"
-          )}
-        >
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main className={cn("main-content flex-1", "mobile-main-safe")}>
+          <div className="mx-auto h-full max-w-7xl px-3 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {children}
           </div>
         </main>

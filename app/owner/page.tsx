@@ -1,63 +1,47 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { AlertCircle, DollarSign, TrendingUp, UserCheck, Users } from "lucide-react"
+import { useCallback, useEffect, useState } from "react"
 import {
-  AttendanceTrendChart,
-  InactiveMembersCard,
-  RevenueBarChart,
-} from "@/components/analytics"
-import { MetricCard, PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  IndianRupee,
+  Loader2,
+  TrendingUp,
+  UserCheck,
+  Users,
+  Zap,
+} from "lucide-react"
 import { toast } from "sonner"
+import Link from "next/link"
+import { AttendanceTrendChart, RevenueBarChart } from "@/components/analytics"
+import { MetricCard, PageIntro, SurfaceCard } from "@/components/powerhouse"
 
+/* ── Types matching DashboardService.getOwnerDashboard() ─────────────────── */
 interface DashboardData {
   metrics: {
-    totalMembers: number
-    activeMembers: number
-    activeTrainers: number
-    weeklyRevenue: number
-    monthlyRevenue: number
-    pendingPaymentsTotal: number
-    avgDailyAttendance: number
+    totalRevenue: number
+    clients: number
+    trainers: number
     attendanceToday: number
-    inactiveMembers: number
-    pendingRequests: number
   }
-  attendance: {
-    trend: Array<{ date: string; checkIns: number }>
-    total: number
-    average: number
-  }
-  revenue: {
-    weekly: Array<{ date: string; revenue: number; pendingTotal: number }>
-    weeklyRevenue: number
-    monthlyRevenue: number
-    pendingPaymentsTotal: number
-  }
-  inactive: {
-    count: number
-    members: Array<{
-      memberId: string
-      fullName: string | null
-      email: string | null
-      lastAttendanceDate: string | null
-    }>
-  }
-  recentPayments: Array<{
-    id: string
-    memberName: string
-    amount: number
-    status: string
-    paymentDate: string
-  }>
-  pendingRequests: Array<{
-    id: string
-    name: string
-    type: string
-    createdAt: string
-  }>
+  trend: Array<{ date: string; checkIns: number; revenue: number }>
 }
 
+interface AlertsData {
+  todayCheckIns: number
+  monthRevenue: number
+  pendingPayments: { count: number; amount: number }
+  expiringMemberships: Array<{ userId: string; name: string; endDate: string; daysLeft: number }>
+  inactiveMembers: Array<{ id: string; name: string; daysSince: number }>
+  recentSignups: Array<{ id: string; name: string; joinedAt: string }>
+}
+
+/* ── Helpers ────────────────────────────────────────────────────────────── */
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -66,213 +50,378 @@ function formatCurrency(value: number) {
   }).format(value)
 }
 
-function formatDate(value: string) {
+function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(new Date(value))
 }
 
+function daysLeftColor(days: number) {
+  if (days <= 2) return "text-red-500"
+  if (days <= 5) return "text-amber-500"
+  return "text-muted-foreground"
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Page
+══════════════════════════════════════════════════════════════════════════ */
 export default function OwnerDashboardPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [alerts, setAlerts] = useState<AlertsData | null>(null)
+  const [loadingDash, setLoadingDash] = useState(true)
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
 
-  useEffect(() => {
-    let mounted = true
+  const loadAll = useCallback(async () => {
+    // Fire both requests in parallel — owner/dashboard is the reliable one
+    const [dashRes, alertsRes] = await Promise.allSettled([
+      fetch("/api/owner/dashboard", {
+        credentials: "include",
+        cache: "no-store",
+      }).then((r) => r.json()),
+      fetch("/api/owner/alerts", {
+        credentials: "include",
+        cache: "no-store",
+      }).then((r) => r.json()),
+    ])
 
-    async function loadDashboard() {
-      try {
-        const response = await fetch("/api/analytics/dashboard", {
-          credentials: "include",
-          cache: "no-store",
-        })
-        const result = await response.json()
-
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || "Unable to load dashboard")
-        }
-
-        if (mounted) {
-          setDashboard(result.data)
-        }
-      } catch (error) {
-        toast.error("Could not load dashboard", {
-          description:
-            error instanceof Error
-              ? error.message
-              : "Please refresh and try again.",
-        })
-      } finally {
-        if (mounted) {
-          setIsLoading(false)
-        }
-      }
+    if (dashRes.status === "fulfilled" && dashRes.value?.success) {
+      setDashboard(dashRes.value.data)
+    } else {
+      const msg =
+        dashRes.status === "fulfilled"
+          ? dashRes.value?.error ?? "Server error"
+          : (dashRes.reason as Error)?.message ?? "Network error"
+      toast.error("Dashboard unavailable", { description: msg })
     }
+    setLoadingDash(false)
 
-    loadDashboard()
-
-    return () => {
-      mounted = false
+    if (alertsRes.status === "fulfilled" && alertsRes.value?.success) {
+      setAlerts(alertsRes.value.data)
     }
+    setLoadingAlerts(false)
   }, [])
 
-  if (isLoading) {
+  useEffect(() => {
+    loadAll()
+  }, [loadAll])
+
+  /* ── Pulse Bar ──────────────────────────────────────────────────────── */
+  const todayCheckIns = alerts?.todayCheckIns ?? dashboard?.metrics?.attendanceToday ?? 0
+  const monthRevenue = alerts?.monthRevenue ?? 0
+  const pendingCount = alerts?.pendingPayments?.count ?? 0
+  const expiringCount = alerts?.expiringMemberships?.length ?? 0
+
+  /* ── Skeleton ───────────────────────────────────────────────────────── */
+  if (loadingDash && !dashboard) {
     return (
-      <div className="space-y-6">
-        <PageIntro
-          title="Dashboard"
-          description="Overview of your gym operations and performance"
-        />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-28 animate-pulse rounded-xl border border-border bg-card"
-            />
-          ))}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-6xl space-y-6 animate-pulse">
+          <PageIntro title="Dashboard" description="Loading command center…" />
+          <div className="h-12 rounded-xl border border-border bg-card" />
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-24 rounded-xl border border-border bg-card" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {[1, 2].map((i) => (
+              <div key={i} className="h-64 rounded-xl border border-border bg-card" />
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
-  if (!dashboard) {
-    return (
-      <div className="space-y-6">
-        <PageIntro
-          title="Dashboard"
-          description="Overview of your gym operations and performance"
-        />
-        <SurfaceCard>
-          <p className="text-sm text-muted-foreground">
-            Dashboard data is unavailable.
-          </p>
-        </SurfaceCard>
-      </div>
-    )
-  }
+  const m = dashboard?.metrics
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-6xl">
         <PageIntro
           title="Dashboard"
-          description="Overview of your gym operations and performance"
+          description="Gym command center — live pulse, trends, and alerts"
         />
 
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* ── Live Pulse Bar ─────────────────────────────────────────── */}
+        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-xs font-semibold text-emerald-500">Live</span>
+          </div>
+
+          <div className="h-4 w-px bg-border" />
+          <span className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">
+              {loadingAlerts ? "—" : todayCheckIns}
+            </span>{" "}
+            check-ins today
+          </span>
+
+          <div className="h-4 w-px bg-border" />
+          <span className="text-sm text-muted-foreground">
+            <span className="font-bold text-foreground">
+              {loadingAlerts ? "—" : formatCurrency(monthRevenue)}
+            </span>{" "}
+            this month
+          </span>
+
+          {!loadingAlerts && pendingCount > 0 && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <Link
+                href="/owner/payments"
+                className="flex items-center gap-1 text-sm text-amber-500 hover:underline"
+              >
+                <Bell className="h-3 w-3" />
+                {pendingCount} payment{pendingCount !== 1 ? "s" : ""} pending
+              </Link>
+            </>
+          )}
+
+          {!loadingAlerts && expiringCount > 0 && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <span className="flex items-center gap-1 text-sm text-red-500">
+                <AlertTriangle className="h-3 w-3" />
+                {expiringCount} expiring this week
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* ── Core Metrics ───────────────────────────────────────────── */}
+        <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           <MetricCard
-            label="Total Members"
-            value={dashboard.metrics.totalMembers}
-            subValue={`${dashboard.metrics.activeMembers} active`}
-            accentColor="red"
+            label="Members"
+            value={m?.clients ?? 0}
+            subValue="Registered clients"
             icon={Users}
+            accentColor="red"
           />
           <MetricCard
-            label="Active Trainers"
-            value={dashboard.metrics.activeTrainers}
-            accentColor="red"
+            label="Trainers"
+            value={m?.trainers ?? 0}
+            subValue="Active staff"
             icon={UserCheck}
+            accentColor="red"
           />
           <MetricCard
-            label="This Week Revenue"
-            value={formatCurrency(dashboard.metrics.weeklyRevenue)}
-            subValue={`${formatCurrency(dashboard.metrics.pendingPaymentsTotal)} pending`}
-            accentColor="red"
-            icon={DollarSign}
+            label="Total Revenue"
+            value={formatCurrency(m?.totalRevenue ?? 0)}
+            subValue={
+              pendingCount > 0
+                ? `${formatCurrency(alerts?.pendingPayments?.amount ?? 0)} pending`
+                : "All-time approved"
+            }
+            icon={IndianRupee}
+            accentColor="green"
           />
           <MetricCard
-            label="Avg. Daily Attendance"
-            value={dashboard.metrics.avgDailyAttendance}
-            subValue={`${dashboard.metrics.attendanceToday} today`}
-            accentColor="red"
+            label="Check-ins Today"
+            value={todayCheckIns}
+            subValue="Live attendance"
             icon={TrendingUp}
+            accentColor="red"
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <RevenueBarChart data={dashboard.revenue.weekly} />
-            <AttendanceTrendChart data={dashboard.attendance.trend} />
-          </div>
-
-          <div className="space-y-6">
-            <InactiveMembersCard count={dashboard.metrics.inactiveMembers} />
-
-            <SurfaceCard>
-              <h3 className="mb-4 text-lg font-semibold text-foreground">
-                Recent Payments
+        {/* ── Charts ─────────────────────────────────────────────────── */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SurfaceCard className="overflow-hidden p-0">
+            <div className="p-4 pb-0">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                7-Day Revenue
               </h3>
-              {dashboard.recentPayments.length > 0 ? (
-                <div className="space-y-3">
-                  {dashboard.recentPayments.map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background p-3"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {payment.memberName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(payment.paymentDate)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-accent">
-                          {formatCurrency(payment.amount)}
-                        </p>
-                        <StatusPill
-                          status={payment.status === "paid" ? "completed" : payment.status}
-                          label={payment.status}
-                          size="sm"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No payments found.
-                </p>
-              )}
-            </SurfaceCard>
-          </div>
+            </div>
+            <RevenueBarChart
+              data={(dashboard?.trend ?? []).map((t) => ({
+                date: t.date,
+                revenue: t.revenue,
+                pendingTotal: 0,
+              }))}
+            />
+          </SurfaceCard>
+
+          <SurfaceCard className="overflow-hidden p-0">
+            <div className="p-4 pb-0">
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                7-Day Attendance
+              </h3>
+            </div>
+            <AttendanceTrendChart data={dashboard?.trend ?? []} />
+          </SurfaceCard>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <SurfaceCard>
-              <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
-                <AlertCircle className="h-5 w-5 text-accent" />
-                Pending Requests
-              </h3>
-              {dashboard.pendingRequests.length > 0 ? (
-                <div className="space-y-3">
-                  {dashboard.pendingRequests.map((request) => (
-                    <div
-                      key={`${request.type}-${request.id}`}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background p-4 transition-colors hover:border-accent/50"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-foreground">
-                          {request.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {request.type}
-                        </p>
-                      </div>
-                      <p className="text-right text-xs text-muted-foreground">
-                        {formatDate(request.createdAt)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+        {/* ── Alerts Row ─────────────────────────────────────────────── */}
+        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Expiring memberships */}
+          <SurfaceCard>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-amber-500" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                  Expiring This Week
+                </h3>
+              </div>
+              <Link
+                href="/owner/members?status=expiring"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                All <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            {loadingAlerts ? (
+              <div className="flex h-24 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (alerts?.expiringMemberships?.length ?? 0) === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500 opacity-40" />
                 <p className="text-sm text-muted-foreground">
-                  No pending requests.
+                  No memberships expiring this week
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {alerts!.expiringMemberships.map((m) => (
+                  <div
+                    key={m.userId}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2"
+                  >
+                    <p className="text-sm font-medium text-foreground">{m.name}</p>
+                    <span className={`text-xs font-bold ${daysLeftColor(m.daysLeft)}`}>
+                      {m.daysLeft === 0
+                        ? "Expires today"
+                        : m.daysLeft === 1
+                          ? "1 day left"
+                          : `${m.daysLeft} days left`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SurfaceCard>
+
+          {/* Inactive members */}
+          <SurfaceCard>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-red-500" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                  Inactive Members
+                </h3>
+              </div>
+              <Link
+                href="/owner/members"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                All <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+
+            {loadingAlerts ? (
+              <div className="flex h-24 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (alerts?.inactiveMembers?.length ?? 0) === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500 opacity-40" />
+                <p className="text-sm text-muted-foreground">
+                  All members active in the last 7 days
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {alerts!.inactiveMembers.slice(0, 6).map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2"
+                  >
+                    <p className="text-sm font-medium text-foreground">{m.name}</p>
+                    <span
+                      className={`text-xs font-bold ${
+                        m.daysSince >= 30 ? "text-red-500" : "text-amber-500"
+                      }`}
+                    >
+                      {m.daysSince >= 999 ? "Never visited" : `${m.daysSince} days ago`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SurfaceCard>
+        </div>
+
+        {/* ── Recent Signups + Month Revenue quick stat ──────────────── */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <SurfaceCard>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-500" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                  Month Revenue
+                </h3>
+              </div>
+              <Link
+                href="/owner/payments"
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                Payments <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <p className="text-4xl font-bold text-foreground tabular-nums">
+                {loadingAlerts ? "—" : formatCurrency(monthRevenue)}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">Approved this month</p>
+              {pendingCount > 0 && (
+                <p className="mt-1 text-sm text-amber-500">
+                  +{formatCurrency(alerts?.pendingPayments?.amount ?? 0)} pending approval
                 </p>
               )}
-            </SurfaceCard>
-          </div>
+            </div>
+          </SurfaceCard>
+
+          <SurfaceCard>
+            <div className="mb-4 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                Quick Links
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: "Pending Payments", href: "/owner/payments", icon: DollarSign, highlight: pendingCount > 0, badge: pendingCount > 0 ? String(pendingCount) : null },
+                { label: "View Analytics", href: "/owner/analytics", icon: TrendingUp, highlight: false, badge: null },
+                { label: "All Members", href: "/owner/members", icon: Users, highlight: false, badge: null },
+                { label: "Salary Payroll", href: "/owner/salary", icon: IndianRupee, highlight: false, badge: null },
+              ].map(({ label, href, icon: Icon, highlight, badge }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`relative flex flex-col items-center gap-2 rounded-lg border px-3 py-4 text-center text-xs font-medium transition-colors ${
+                    highlight
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                  }`}
+                >
+                  {badge && (
+                    <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-black">
+                      {badge}
+                    </span>
+                  )}
+                  <Icon className="h-5 w-5" />
+                  {label}
+                </Link>
+              ))}
+            </div>
+          </SurfaceCard>
         </div>
       </div>
     </div>

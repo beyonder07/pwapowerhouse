@@ -12,6 +12,7 @@ import {
   Bell,
   Calendar,
   CheckCircle,
+  FileCheck,
   Loader2,
   MapPin,
   User,
@@ -34,6 +35,7 @@ interface MembershipRequest {
 
 interface TrainerApplication extends MembershipRequest {
   experience: string
+  govtIdUrl?: string | null
   specialization: string
 }
 
@@ -164,9 +166,16 @@ export default function OwnerRequestsPage() {
         )
       }
 
-      toast.success(
-        confirmAction === "approve" ? "Request approved" : "Request rejected"
-      )
+      if (confirmAction === "approve" && result.data?.tempPassword) {
+        toast.success("Request approved — account created", {
+          description: `Share this temporary password with ${selectedRequest.name}: ${result.data.tempPassword}`,
+          duration: 20000,
+        })
+      } else {
+        toast.success(
+          confirmAction === "approve" ? "Request approved" : "Request rejected"
+        )
+      }
       setShowConfirmDialog(false)
       setSelectedRequest(null)
       setConfirmAction(null)
@@ -324,6 +333,28 @@ export default function OwnerRequestsPage() {
                           </p>
                         </div>
                       </div>
+                      {app.govtIdUrl && (
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-3">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                            <FileCheck className="h-4 w-4 text-emerald-500" />
+                            Government ID photo uploaded
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            asChild
+                            className="h-8 text-[10px] font-black uppercase tracking-widest hover:text-emerald-500"
+                          >
+                            <a
+                              href={app.govtIdUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              View ID
+                            </a>
+                          </Button>
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Button
                           size="sm"
