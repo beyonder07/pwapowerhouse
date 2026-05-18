@@ -1,4 +1,4 @@
-import { createSupabaseAuthClient } from "@/src/services/supabase.service"
+import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 
 export interface BranchSummary {
   id: string
@@ -8,7 +8,7 @@ export interface BranchSummary {
 
 export class BranchesService {
   async listActive(): Promise<BranchSummary[]> {
-    const supabase = createSupabaseAuthClient()
+    const supabase = createSupabaseServiceRoleClient()
     const { data, error } = await supabase
       .from("gyms")
       .select("id,name,radius")
