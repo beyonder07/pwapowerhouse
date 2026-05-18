@@ -124,19 +124,7 @@ function nextAction(today: AttendanceData["today"]): AttendanceAction | null {
   return null
 }
 
-function isWithinCheckInWindow(now = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now)
-  const values = Object.fromEntries(parts.map((p) => [p.type, p.value]))
-  const mins = Number(values.hour) * 60 + Number(values.minute)
-  return (
-    (mins >= 360 && mins <= 600) || (mins >= 960 && mins <= 1320)
-  )
-}
+
 
 export default function TrainerAttendancePage() {
   const [attendance, setAttendance] = useState<AttendanceData | null>(null)
@@ -172,9 +160,6 @@ export default function TrainerAttendancePage() {
     () => (attendance ? nextAction(attendance.today) : null),
     [attendance]
   )
-
-  const canCheckInNow =
-    activeAction !== "check_in" || isWithinCheckInWindow()
 
   const handleAttendanceAction = () => {
     if (!activeAction) return
@@ -251,20 +236,17 @@ export default function TrainerAttendancePage() {
     )
   }
 
-  const { today, operatingWindows } = attendance
-  const description =
-    operatingWindows.length > 0
-      ? `Check-in windows: ${operatingWindows.map((w) => w.windowLabel).join(" · ")}`
-      : "Check-in 6:00–10:00 AM · 4:00–10:00 PM"
+  const { today, floorTiming } = attendance
+  const description = floorTiming.startLabel && floorTiming.endLabel
+    ? `Expected floor hours: ${floorTiming.startLabel} – ${floorTiming.endLabel}`
+    : "Mark your daily check-in and check-out"
 
   const buttonLabel = !activeAction
     ? today.checkedOut
       ? "Day complete"
       : "Already checked in"
     : activeAction === "check_in"
-      ? canCheckInNow
-        ? "Check In"
-        : "Outside check-in hours"
+      ? "Check In"
       : "Check Out"
 
   return (
@@ -273,7 +255,7 @@ export default function TrainerAttendancePage() {
         <div className="hidden sm:block" />
         <Button
           onClick={handleAttendanceAction}
-          disabled={Boolean(pendingAction) || !activeAction || !canCheckInNow}
+          disabled={Boolean(pendingAction) || !activeAction}
           className="h-11 w-full sm:w-auto"
         >
           {pendingAction ? (

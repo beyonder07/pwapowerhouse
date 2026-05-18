@@ -24,64 +24,6 @@ export interface StoredDailyAttendance {
 const DEFAULT_FLOOR_START = "06:00:00"
 const HALF_DAY_RATIO = 0.5
 
-/** Gym trainer check-in windows (Asia/Kolkata). */
-export const TRAINER_OPERATING_WINDOWS = [
-  {
-    key: "morning" as const,
-    label: "Morning",
-    windowLabel: "6:00 AM – 10:00 AM",
-    startMinutes: 6 * 60,
-    endMinutes: 10 * 60,
-    lateAfterMinutes: 6 * 60,
-  },
-  {
-    key: "evening" as const,
-    label: "Evening",
-    windowLabel: "4:00 PM – 10:00 PM",
-    startMinutes: 16 * 60,
-    endMinutes: 22 * 60,
-    lateAfterMinutes: 16 * 60,
-  },
-] as const
-
-export type TrainerOperatingWindowKey =
-  (typeof TRAINER_OPERATING_WINDOWS)[number]["key"]
-
-export function resolveCheckInWindow(
-  date: Date | string = new Date(),
-  timeZone = "Asia/Kolkata"
-) {
-  const minutes =
-    typeof date === "string"
-      ? checkInMinutesFromIso(date, timeZone)
-      : zonedParts(date, timeZone).minutes
-
-  return (
-    TRAINER_OPERATING_WINDOWS.find(
-      (window) =>
-        minutes >= window.startMinutes && minutes <= window.endMinutes
-    ) ?? null
-  )
-}
-
-export function assertCheckInAllowed(
-  date: Date | string = new Date(),
-  timeZone = "Asia/Kolkata"
-) {
-  if (resolveCheckInWindow(date, timeZone)) return
-  throw new Error(
-    "Check-in is available only during 6:00–10:00 AM and 4:00–10:00 PM"
-  )
-}
-
-export function operatingWindowsForDisplay() {
-  return TRAINER_OPERATING_WINDOWS.map((window) => ({
-    key: window.key,
-    label: window.label,
-    windowLabel: window.windowLabel,
-  }))
-}
-
 export function pad(value: number) {
   return String(value).padStart(2, "0")
 }
@@ -131,18 +73,17 @@ export function checkInMinutesFromIso(iso: string, timeZone = "Asia/Kolkata") {
   return zonedParts(new Date(iso), timeZone).minutes
 }
 
+/**
+ * Determines if a check-in is late.
+ * Compares the check-in time against the trainer's floorStartTime.
+ * If no floorStartTime is set, defaults to 06:00.
+ */
 export function isCheckInLate(
   checkInIso: string,
   floorStartTime: string | null | undefined,
   graceMinutes = 0
 ) {
-  const window = resolveCheckInWindow(checkInIso)
   const minutes = checkInMinutesFromIso(checkInIso)
-
-  if (window) {
-    return minutes > window.lateAfterMinutes + graceMinutes
-  }
-
   const expected = parseTimeToMinutes(floorStartTime ?? DEFAULT_FLOOR_START)
   if (expected === null) return false
   return minutes > expected + graceMinutes
@@ -221,6 +162,7 @@ export function normalizeStoredDay(row: unknown): StoredDailyAttendance | null {
     }
   }
 
+  // Legacy: merge morning/evening sessions into a single daily record
   const sessions = asRecord(record?.sessions)
   if (!sessions) return null
 

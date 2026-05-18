@@ -12,8 +12,6 @@ import {
   formatWorkDuration,
   isCheckInLate,
   normalizeStoredDay,
-  operatingWindowsForDisplay,
-  resolveCheckInWindow,
   type DailyAttendanceStatus,
   formatFloorTimeLabel,
   type StoredDailyAttendance,
@@ -950,12 +948,6 @@ export class TrainerPanelService {
         throw new ConflictError("You already checked in today")
       }
 
-      if (!resolveCheckInWindow(now)) {
-        throw new BadRequestError(
-          "Check-in is available only during 6:00–10:00 AM and 4:00–10:00 PM"
-        )
-      }
-
       const isLate = isCheckInLate(now.toISOString(), floor.floorStartTime)
       day = {
         date: dateKey,
@@ -1111,7 +1103,7 @@ export class TrainerPanelService {
         startLabel: formatFloorTimeLabel(floor.floorStartTime),
         endLabel: formatFloorTimeLabel(floor.floorEndTime),
       },
-      operatingWindows: operatingWindowsForDisplay(),
+      operatingWindows: [],
       today: {
         checkedIn: Boolean(todayRecord?.checkInAt),
         checkedOut: Boolean(todayRecord?.checkOutAt),
@@ -1342,12 +1334,6 @@ export class TrainerPanelService {
     if (input.action === "check_in") {
       if (existing.data?.check_in_time) {
         throw new ConflictError("You already checked in today")
-      }
-
-      if (!resolveCheckInWindow(new Date())) {
-        throw new BadRequestError(
-          "Check-in is available only during 6:00–10:00 AM and 4:00–10:00 PM"
-        )
       }
 
       const isLate = isCheckInLate(nowIso, floor.floorStartTime)
