@@ -61,6 +61,10 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value)
 }
 
+function formatDate(dateStr: string) {
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(dateStr))
+}
+
 function monthOptions() {
   const options = []
   const now = new Date()
