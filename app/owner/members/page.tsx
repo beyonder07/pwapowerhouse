@@ -118,7 +118,7 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                       </div>
                       <div className="flex items-center gap-2 text-sm text-foreground bg-background/50 rounded-lg p-2.5">
                         <span className="font-semibold">{formatDate(detail.membership.startDate)}</span>
-                        <span className="text-muted-foreground/50 font-bold">→</</span>
+                        <span className="text-muted-foreground/50 font-bold">&rarr;</span>
                         <span className="font-semibold">{formatDate(detail.membership.endDate)}</span>
                       </div>
                     </div>

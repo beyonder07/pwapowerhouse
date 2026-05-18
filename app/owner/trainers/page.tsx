@@ -307,6 +307,7 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
 
             </>
           )}
+          </div>
         </div>
       </div>
     </div>
