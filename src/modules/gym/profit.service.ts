@@ -33,7 +33,11 @@ function toNumber(val: any) {
 
 export async function getProfitMetrics(ctx: AuthContext, month: string): Promise<ProfitMetrics> {
   requireRole(ctx, ["owner"])
-  const gymId = getOwnerGymId(ctx)
+  let gymId = getOwnerGymId(ctx)
+  if (!gymId) {
+    const { data } = await admin.from("gyms").select("id").limit(1).single()
+    if (data) gymId = data.id
+  }
   if (!gymId) throw new Error("Gym ID required")
 
   const monthPrefix = month.slice(0, 7) // "YYYY-MM"
@@ -131,7 +135,11 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
 
 export async function addExpense(ctx: AuthContext, data: { category: string, title: string, amount: number, date: string, notes?: string }) {
   requireRole(ctx, ["owner"])
-  const gymId = getOwnerGymId(ctx)
+  let gymId = getOwnerGymId(ctx)
+  if (!gymId) {
+    const { data } = await admin.from("gyms").select("id").limit(1).single()
+    if (data) gymId = data.id
+  }
   if (!gymId) throw new Error("Gym ID required")
 
   const { error } = await admin.from("gym_expenses").insert({
@@ -152,7 +160,11 @@ export async function addExpense(ctx: AuthContext, data: { category: string, tit
 
 export async function deleteExpense(ctx: AuthContext, id: string) {
   requireRole(ctx, ["owner"])
-  const gymId = getOwnerGymId(ctx)
+  let gymId = getOwnerGymId(ctx)
+  if (!gymId) {
+    const { data } = await admin.from("gyms").select("id").limit(1).single()
+    if (data) gymId = data.id
+  }
   if (!gymId) throw new Error("Gym ID required")
 
   const { error } = await admin.from("gym_expenses").delete().eq("id", id).eq("gym_id", gymId)
