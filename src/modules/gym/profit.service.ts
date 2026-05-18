@@ -15,6 +15,16 @@ export interface GymExpense {
   notes: string | null
 }
 
+export interface GymRevenue {
+  id: string
+  gymId: string
+  category: "Supplement" | "Personal Training" | "Merchandise" | "Other"
+  title: string
+  amount: number
+  date: string
+  notes: string | null
+}
+
 export interface ProfitMetrics {
   month: string
   clientRevenue: number
@@ -23,6 +33,7 @@ export interface ProfitMetrics {
   miscExpenses: number
   netProfit: number
   expenses: GymExpense[]
+  manualRevenueLogs: GymRevenue[]
   revenueVsExpenseRatio: number
 }
 
@@ -59,6 +70,38 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
   if (paymentsRes.data) {
     clientRevenue = paymentsRes.data.reduce((sum, p) => sum + toNumber(p.amount), 0)
   }
+
+  // 1b. Manual Revenue (from gym_revenue table)
+  let manualRevenueLogs: GymRevenue[] = []
+  let manualRevenueTotal = 0
+  
+  const revenueRes = await admin
+    .from("gym_revenue")
+    .select("*")
+    .eq("gym_id", gymId)
+    .gte("date", startOfMonth)
+    .lte("date", endOfMonth)
+    .order("date", { ascending: false })
+
+  if (revenueRes.error) {
+    const code = (revenueRes.error as any).code
+    if (code !== "42P01" && code !== "PGRST200" && code !== "PGRST205") {
+      throw revenueRes.error
+    }
+  } else if (revenueRes.data) {
+    manualRevenueLogs = revenueRes.data.map((r: any) => ({
+      id: r.id,
+      gymId: r.gym_id,
+      category: r.category,
+      title: r.title,
+      amount: toNumber(r.amount),
+      date: r.date,
+      notes: r.notes,
+    }))
+    manualRevenueTotal = manualRevenueLogs.reduce((sum, r) => sum + r.amount, 0)
+  }
+  
+  clientRevenue += manualRevenueTotal
 
   // 2. Trainer Payroll
   // Need to get all trainers in this gym, then sum their salaries for this month
@@ -129,8 +172,47 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
     miscExpenses,
     netProfit,
     expenses,
+    manualRevenueLogs,
     revenueVsExpenseRatio: Math.round(ratio)
   }
+}
+
+export async function addRevenue(ctx: AuthContext, data: { category: string, title: string, amount: number, date: string, notes?: string }) {
+  requireRole(ctx, ["owner"])
+  let gymId = getOwnerGymId(ctx)
+  if (!gymId) {
+    const { data } = await admin.from("gyms").select("id").limit(1).single()
+    if (data) gymId = data.id
+  }
+  if (!gymId) throw new Error("Gym ID required")
+
+  const { error } = await admin.from("gym_revenue").insert({
+    gym_id: gymId,
+    category: data.category,
+    title: data.title,
+    amount: data.amount,
+    date: data.date,
+    notes: data.notes || null
+  })
+
+  if (error) {
+    const code = (error as any).code
+    if (code === "42P01") throw new Error("TABLE_MISSING")
+    throw error
+  }
+}
+
+export async function deleteRevenue(ctx: AuthContext, id: string) {
+  requireRole(ctx, ["owner"])
+  let gymId = getOwnerGymId(ctx)
+  if (!gymId) {
+    const { data } = await admin.from("gyms").select("id").limit(1).single()
+    if (data) gymId = data.id
+  }
+  if (!gymId) throw new Error("Gym ID required")
+
+  const { error } = await admin.from("gym_revenue").delete().eq("id", id).eq("gym_id", gymId)
+  if (error) throw error
 }
 
 export async function addExpense(ctx: AuthContext, data: { category: string, title: string, amount: number, date: string, notes?: string }) {

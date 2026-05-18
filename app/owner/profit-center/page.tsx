@@ -34,6 +34,16 @@ interface GymExpense {
   notes: string | null
 }
 
+interface GymRevenue {
+  id: string
+  gymId: string
+  category: "Supplement" | "Personal Training" | "Merchandise" | "Other"
+  title: string
+  amount: number
+  date: string
+  notes: string | null
+}
+
 interface ProfitMetrics {
   month: string
   clientRevenue: number
@@ -42,6 +52,7 @@ interface ProfitMetrics {
   miscExpenses: number
   netProfit: number
   expenses: GymExpense[]
+  manualRevenueLogs: GymRevenue[]
   revenueVsExpenseRatio: number
 }
 
@@ -68,6 +79,11 @@ export default function ProfitCenterPage() {
   const [data, setData] = useState<ProfitMetrics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [needsSetup, setNeedsSetup] = useState(false)
+
+  // Add Revenue State
+  const [showAddRevenue, setShowAddRevenue] = useState(false)
+  const [newRevenue, setNewRevenue] = useState({ title: "", amount: "", category: "Supplement", date: new Date().toISOString().split("T")[0]!, notes: "" })
+  const [isSubmittingRev, setIsSubmittingRev] = useState(false)
 
   // Add Expense State
   const [showAddExpense, setShowAddExpense] = useState(false)
@@ -130,10 +146,48 @@ export default function ProfitCenterPage() {
     }
   }
 
+  async function handleAddRevenue() {
+    if (!newRevenue.title || !newRevenue.amount) return toast.error("Title and amount required")
+    setIsSubmittingRev(true)
+    try {
+      const res = await fetch("/api/owner/revenue", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newRevenue, amount: Number(newRevenue.amount) })
+      })
+      const json = await res.json()
+      if (json.error === "TABLE_MISSING") {
+        setNeedsSetup(true)
+        throw new Error("Setup required")
+      }
+      if (!res.ok || !json.success) throw new Error(json.error || "Failed to add revenue")
+      toast.success("Revenue added")
+      setShowAddRevenue(false)
+      setNewRevenue({ title: "", amount: "", category: "Supplement", date: new Date().toISOString().split("T")[0]!, notes: "" })
+      loadData()
+    } catch (error) {
+      if ((error as any).message !== "Setup required") {
+        toast.error("Action failed", { description: (error as any).message })
+      }
+    } finally {
+      setIsSubmittingRev(false)
+    }
+  }
+
   async function handleDeleteExpense(id: string) {
     if (!confirm("Delete this expense?")) return
     try {
       const res = await fetch(`/api/owner/expenses?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Delete failed")
+      loadData()
+    } catch {
+      toast.error("Failed to delete")
+    }
+  }
+
+  async function handleDeleteRevenue(id: string) {
+    if (!confirm("Delete this revenue entry?")) return
+    try {
+      const res = await fetch(`/api/owner/revenue?id=${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Delete failed")
       loadData()
     } catch {
@@ -169,11 +223,14 @@ export default function ProfitCenterPage() {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <PageIntro title="Profit Center" description="Business intelligence, expense tracking, and net profitability" />
           <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-2 border-emerald-500/50 text-emerald-500 hover:bg-emerald-500/10" onClick={() => setShowAddRevenue(true)}>
+              <ArrowUpCircle className="h-4 w-4" /> Add Income
+            </Button>
+            <Button size="sm" variant="outline" className="gap-2 border-red-500/50 text-red-500 hover:bg-red-500/10" onClick={() => setShowAddExpense(true)}>
+              <ArrowDownCircle className="h-4 w-4" /> Add Expense
+            </Button>
             <Button size="sm" variant="outline" className="gap-2" onClick={() => setShowCalculator(!showCalculator)}>
               <Calculator className="h-4 w-4" /> Calculator
-            </Button>
-            <Button size="sm" className="gap-2 bg-primary text-background hover:bg-primary/90" onClick={() => setShowAddExpense(true)}>
-              <PlusCircle className="h-4 w-4" /> Add Expense
             </Button>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
@@ -188,12 +245,23 @@ export default function ProfitCenterPage() {
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
             <p className="mb-2 text-sm font-bold text-amber-500">Setup Required</p>
             <p className="mb-3 text-xs text-muted-foreground">
-              To use the Profit Center, create the <code className="rounded bg-muted px-1 py-0.5 text-amber-400">gym_expenses</code> table in Supabase.
+              To use the Profit Center, create the <code className="rounded bg-muted px-1 py-0.5 text-amber-400">gym_expenses</code> and <code className="rounded bg-muted px-1 py-0.5 text-amber-400">gym_revenue</code> tables in Supabase.
             </p>
             <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-[10px] text-muted-foreground">{`CREATE TABLE gym_expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gym_id UUID NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
   category TEXT NOT NULL CHECK (category IN ('EB', 'Maintenance', 'Equipment', 'Marketing', 'Supplies', 'Other')),
+  title TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  date DATE NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE gym_revenue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  gym_id UUID NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('Supplement', 'Personal Training', 'Merchandise', 'Other')),
   title TEXT NOT NULL,
   amount NUMERIC NOT NULL,
   date DATE NOT NULL,
@@ -266,8 +334,8 @@ export default function ProfitCenterPage() {
                       <div className="flex items-center gap-3">
                         <ArrowUpCircle className="h-5 w-5 text-emerald-500" />
                         <div>
-                          <p className="font-bold text-foreground">Client Revenue</p>
-                          <p className="text-xs text-muted-foreground">Memberships & Add-ons</p>
+                          <p className="font-bold text-foreground">Total Revenue</p>
+                          <p className="text-xs text-muted-foreground">Memberships, Add-ons, Misc Income</p>
                         </div>
                       </div>
                       <p className="font-bold text-emerald-500">+{formatCurrency(data.clientRevenue)}</p>
@@ -308,55 +376,126 @@ export default function ProfitCenterPage() {
                   </div>
                 </SurfaceCard>
 
-                {/* Expense List */}
+                {/* Manual Logs Lists */}
                 <div>
                   <div className="mb-3 flex items-center justify-between">
-                    <h3 className="font-bold text-foreground">Logged Expenses</h3>
+                    <h3 className="font-bold text-foreground">Manual Logs</h3>
                   </div>
-                  {data.expenses.length === 0 ? (
+                  
+                  {data.manualRevenueLogs.length === 0 && data.expenses.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                      No expenses logged for this month.
+                      No manual entries logged for this month.
                     </div>
                   ) : (
-                    <div className="space-y-2">
-                      {data.expenses.map(exp => (
-                        <div key={exp.id} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-semibold text-foreground">{exp.title}</p>
-                              <span className="rounded bg-secondary px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">{exp.category}</span>
+                    <div className="space-y-4">
+                      {/* Revenue Logs */}
+                      {data.manualRevenueLogs.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Additional Income</p>
+                          {data.manualRevenueLogs.map(rev => (
+                            <div key={rev.id} className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-foreground">{rev.title}</p>
+                                  <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-emerald-600">{rev.category}</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(rev.date)} {rev.notes && `· ${rev.notes}`}</p>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <p className="font-bold text-emerald-500">+{formatCurrency(rev.amount)}</p>
+                                <button onClick={() => handleDeleteRevenue(rev.id)} className="text-muted-foreground hover:text-red-500">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
                             </div>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(exp.date)} {exp.notes && `· ${exp.notes}`}</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <p className="font-bold text-red-500">-{formatCurrency(exp.amount)}</p>
-                            <button onClick={() => handleDeleteExpense(exp.id)} className="text-muted-foreground hover:text-red-500">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+
+                      {/* Expense Logs */}
+                      {data.expenses.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Expenses</p>
+                          {data.expenses.map(exp => (
+                            <div key={exp.id} className="flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-foreground">{exp.title}</p>
+                                  <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-red-600">{exp.category}</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(exp.date)} {exp.notes && `· ${exp.notes}`}</p>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <p className="font-bold text-red-500">-{formatCurrency(exp.amount)}</p>
+                                <button onClick={() => handleDeleteExpense(exp.id)} className="text-muted-foreground hover:text-red-500">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
 
               <div className="space-y-6">
-                {showAddExpense && (
-                  <SurfaceCard className="border-primary/30 shadow-lg">
+                {showAddRevenue && (
+                  <SurfaceCard className="border-emerald-500/30 shadow-lg">
                     <div className="mb-4 flex items-center justify-between">
-                      <h3 className="font-bold text-foreground">Add Expense</h3>
+                      <h3 className="font-bold text-emerald-600">Add Income</h3>
+                      <button onClick={() => setShowAddRevenue(false)}><X className="h-4 w-4 text-muted-foreground" /></button>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Title</label>
+                        <input type="text" value={newRevenue.title} onChange={e => setNewRevenue({...newRevenue, title: e.target.value})} placeholder="e.g. Protein Powder Sold" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount</label>
+                          <input type="number" value={newRevenue.amount} onChange={e => setNewRevenue({...newRevenue, amount: e.target.value})} placeholder="₹" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Category</label>
+                          <Select value={newRevenue.category} onValueChange={v => setNewRevenue({...newRevenue, category: v})}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Supplement">Supplement</SelectItem>
+                              <SelectItem value="Personal Training">Personal Training</SelectItem>
+                              <SelectItem value="Merchandise">Merchandise</SelectItem>
+                              <SelectItem value="Other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</label>
+                        <input type="date" value={newRevenue.date} onChange={e => setNewRevenue({...newRevenue, date: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-emerald-500 focus:outline-none" />
+                      </div>
+                      <Button className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" onClick={handleAddRevenue} disabled={isSubmittingRev}>
+                        {isSubmittingRev ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Income"}
+                      </Button>
+                    </div>
+                  </SurfaceCard>
+                )}
+
+                {showAddExpense && (
+                  <SurfaceCard className="border-red-500/30 shadow-lg">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="font-bold text-red-600">Add Expense</h3>
                       <button onClick={() => setShowAddExpense(false)}><X className="h-4 w-4 text-muted-foreground" /></button>
                     </div>
                     <div className="space-y-3">
                       <div>
                         <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Title</label>
-                        <input type="text" value={newExpense.title} onChange={e => setNewExpense({...newExpense, title: e.target.value})} placeholder="e.g. Broken Mirror Repair" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+                        <input type="text" value={newExpense.title} onChange={e => setNewExpense({...newExpense, title: e.target.value})} placeholder="e.g. Broken Mirror Repair" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-red-500 focus:outline-none" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Amount</label>
-                          <input type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} placeholder="₹" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+                          <input type="number" value={newExpense.amount} onChange={e => setNewExpense({...newExpense, amount: e.target.value})} placeholder="₹" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-red-500 focus:outline-none" />
                         </div>
                         <div>
                           <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Category</label>
@@ -375,9 +514,9 @@ export default function ProfitCenterPage() {
                       </div>
                       <div>
                         <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Date</label>
-                        <input type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+                        <input type="date" value={newExpense.date} onChange={e => setNewExpense({...newExpense, date: e.target.value})} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:border-red-500 focus:outline-none" />
                       </div>
-                      <Button className="w-full" onClick={handleAddExpense} disabled={isSubmitting}>
+                      <Button className="w-full bg-red-500 hover:bg-red-600 text-white" onClick={handleAddExpense} disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Expense"}
                       </Button>
                     </div>
