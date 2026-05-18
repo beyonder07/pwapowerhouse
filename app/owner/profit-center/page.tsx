@@ -14,6 +14,8 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Users,
+  X,
   Zap,
 } from "lucide-react"
 import { toast } from "sonner"
