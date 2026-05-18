@@ -13,11 +13,13 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  PieChart,
 } from "lucide-react"
 
 const OWNER_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/owner", icon: BarChart3 },
   { label: "Analytics", href: "/owner/analytics", icon: TrendingUp },
+  { label: "Profit", href: "/owner/profit-center", icon: PieChart },
   { label: "Members", href: "/owner/members", icon: Users },
   { label: "Trainers", href: "/owner/trainers", icon: UserCheck },
   { label: "Payments", href: "/owner/payments", icon: DollarSign },
