@@ -3,6 +3,7 @@ import type { RequestStatusUpdateInput } from "./admin-request.schema"
 import { RequestProvisioningService } from "./request-provisioning.service"
 import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import { BadRequestError, NotFoundError } from "@/src/utils/errors"
+import { decrypt } from "@/src/utils/crypto"
 
 interface RequestRow {
   id: string
@@ -20,6 +21,7 @@ interface RequestRow {
     specialization?: string
     experience?: string
     openToAnyBranch?: boolean
+    encryptedPassword?: string
   }
   status: string
   created_at: string
@@ -72,6 +74,18 @@ export class AdminRequestService {
       return request.data.branchName ?? "Unassigned branch"
     }
 
+    const getDecryptedPassword = (request: RequestRow) => {
+      if (request.data.encryptedPassword) {
+        try {
+          return decrypt(request.data.encryptedPassword)
+        } catch (e) {
+          console.error("Failed to decrypt password for list pending requests:", e)
+          return "[Decryption Failed]"
+        }
+      }
+      return null
+    }
+
     const memberships = requests.filter((request) =>
       ["client", "member"].includes(request.type)
     )
@@ -86,6 +100,7 @@ export class AdminRequestService {
         branch: resolveBranch(request),
         status: request.status,
         createdAt: request.created_at,
+        password: getDecryptedPassword(request),
       })),
       trainerApplications: trainers.map((request) => ({
         id: request.id,
@@ -98,6 +113,7 @@ export class AdminRequestService {
         govtIdUrl: request.data.govtIdUrl ?? null,
         status: request.status,
         createdAt: request.created_at,
+        password: getDecryptedPassword(request),
       })),
     }
   }

@@ -31,6 +31,7 @@ interface MembershipRequest {
   branch: string
   status: string
   createdAt: string
+  password?: string | null
 }
 
 interface TrainerApplication extends MembershipRequest {
@@ -245,6 +246,11 @@ export default function OwnerRequestsPage() {
                       <div className="text-sm text-muted-foreground space-y-1 mb-3">
                         <p className="break-all">{request.email}</p>
                         <p>{request.phone}</p>
+                        {request.password && (
+                          <p className="text-foreground text-xs font-semibold">
+                            Password: <span className="font-mono bg-secondary border border-border/40 px-1.5 py-0.5 rounded text-xs select-all text-accent">{request.password}</span>
+                          </p>
+                        )}
                         <div className="flex flex-wrap items-center gap-4 text-xs">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
@@ -307,6 +313,11 @@ export default function OwnerRequestsPage() {
                       <div className="text-sm text-muted-foreground space-y-1 mb-3">
                         <p className="break-all">{app.email}</p>
                         <p>{app.phone}</p>
+                        {app.password && (
+                          <p className="text-foreground text-xs font-semibold">
+                            Password: <span className="font-mono bg-secondary border border-border/40 px-1.5 py-0.5 rounded text-xs select-all text-accent">{app.password}</span>
+                          </p>
+                        )}
                         <div className="flex flex-wrap items-center gap-4 text-xs">
                           <span className="flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
