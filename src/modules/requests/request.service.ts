@@ -1,4 +1,4 @@
-import { createSupabaseAuthClient } from "@/src/services/supabase.service"
+import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import type {
   MembershipRequestInput,
   TrainerApplicationInput,
@@ -7,7 +7,7 @@ import { encrypt } from "@/src/utils/crypto"
 
 export class RequestService {
   async createMembershipRequest(input: MembershipRequestInput) {
-    const supabase = createSupabaseAuthClient()
+    const supabase = createSupabaseServiceRoleClient()
     const { error } = await supabase.from("requests").insert({
       type: "client",
       data: {
@@ -31,7 +31,7 @@ export class RequestService {
   }
 
   async createTrainerApplication(input: TrainerApplicationInput) {
-    const supabase = createSupabaseAuthClient()
+    const supabase = createSupabaseServiceRoleClient()
     const { error } = await supabase.from("requests").insert({
       type: "trainer",
       data: {
