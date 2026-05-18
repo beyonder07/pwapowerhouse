@@ -476,7 +476,7 @@ export default function TrainerSignupPage() {
               }
               disabled={isLoading}
             >
-              <SelectTrigger className="bg-secondary border-border">
+              <SelectTrigger className="bg-secondary border-border w-full">
                 <SelectValue placeholder="Select area" />
               </SelectTrigger>
               <SelectContent>
@@ -532,7 +532,7 @@ export default function TrainerSignupPage() {
             }
             disabled={isLoading}
           >
-            <SelectTrigger className="bg-secondary border-border">
+            <SelectTrigger className="bg-secondary border-border w-full">
               <SelectValue
                 placeholder={
                   isLoadingBranches ? "Loading branches..." : "Select a branch"

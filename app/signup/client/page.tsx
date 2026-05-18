@@ -214,7 +214,7 @@ export default function ClientSignupPage() {
           <div className="grid gap-2">
             <Label>Branch</Label>
             <Select value={formData.branch} onValueChange={v => setFormData({...formData, branch: v})}>
-              <SelectTrigger><SelectValue placeholder="Select Branch" /></SelectTrigger>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Select Branch" /></SelectTrigger>
               <SelectContent>
                 {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
@@ -233,7 +233,7 @@ export default function ClientSignupPage() {
               <div className="space-y-1.5">
                 <Label className="text-[10px] uppercase font-bold text-muted-foreground">ID Type</Label>
                 <Select value={formData.govtIdType} onValueChange={v => setFormData({...formData, govtIdType: v})}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Type" /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-xs w-full"><SelectValue placeholder="Select Type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="aadhar">Aadhar Card</SelectItem>
                     <SelectItem value="pan">PAN Card</SelectItem>
