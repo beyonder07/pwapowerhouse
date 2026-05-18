@@ -1,0 +1,87 @@
+{
+  "trainer": {
+    "id": "0c9e58f9-7a78-473a-84f1-647975b2b1fe",
+    "role": "trainer",
+    "gymId": "9e5742ab-6dec-4b97-807a-90f91849c227"
+  },
+  "members": [
+    {
+      "id": "cb8dd23f-d5da-4e8a-a565-bda0987008e0",
+      "name": "Abhay saxena ",
+      "avatarUrl": null,
+      "status": "active"
+    },
+    {
+      "id": "c4e8dd3c-456d-4df8-9b0c-a4920e624a14",
+      "name": "Duplicate Client",
+      "avatarUrl": null,
+      "status": "active"
+    },
+    {
+      "id": "eef8ff16-e9ed-4627-84f9-eb2a7a38ad9f",
+      "name": "govind",
+      "avatarUrl": "https://cuiebmctxfiyvmuwcubt.supabase.co/storage/v1/object/public/profile-images/profiles/eef8ff16-e9ed-4627-84f9-eb2a7a38ad9f/avatar-1778868922876.png",
+      "status": "active"
+    },
+    {
+      "id": "5559a30f-ef95-45ea-8036-ab5ea6301e3f",
+      "name": "PowerHouse Test Client",
+      "avatarUrl": null,
+      "status": "active"
+    }
+  ],
+  "plans": [
+    {
+      "id": "48e282bb-3447-41c1-a63a-d9f225b632ee",
+      "memberId": "eef8ff16-e9ed-4627-84f9-eb2a7a38ad9f",
+      "memberName": "govind",
+      "title": "bdhsdh",
+      "notes": "no injury full potential",
+      "status": "active",
+      "split": [
+        {
+          "day": "Day 1",
+          "exercises": [
+            {
+              "name": "bench",
+              "sets": 3,
+              "reps": "10",
+              "restDuration": "60 sec",
+              "notes": ""
+            }
+          ]
+        }
+      ],
+      "dayCount": 1,
+      "exerciseCount": 1,
+      "updatedAt": "2026-05-17T13:47:13.163Z",
+      "needsUpdate": false
+    },
+    {
+      "id": "d29c1848-8be5-4d12-96e1-8718c817e760",
+      "memberId": "cb8dd23f-d5da-4e8a-a565-bda0987008e0",
+      "memberName": "Abhay saxena ",
+      "title": "chest day",
+      "notes": "",
+      "status": "active",
+      "split": [
+        {
+          "day": "Day 1",
+          "exercises": [
+            {
+              "name": "bench press",
+              "sets": 3,
+              "reps": "10",
+              "restDuration": "60 sec",
+              "notes": ""
+            }
+          ]
+        }
+      ],
+      "dayCount": 1,
+      "exerciseCount": 1,
+      "updatedAt": "2026-05-17T13:03:37.092Z",
+      "needsUpdate": false
+    }
+  ]
+}

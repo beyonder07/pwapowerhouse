@@ -4,7 +4,9 @@ export const PaymentRequestSchema = z.object({
   amount: z.number().positive("Amount must be positive"),
   planDuration: z.number().int().min(1, "Duration must be at least 1 day"),
   paymentMode: z.enum(["upi", "cash"]),
-  screenshotUrl: z.string().url("Valid screenshot URL required").optional()
+  screenshotUrl: z.string().optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid start date format").optional(),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid payment date format").optional()
 }).refine((data) => {
   if (data.paymentMode === "upi" && !data.screenshotUrl) {
     return false
@@ -16,3 +18,4 @@ export const PaymentRequestSchema = z.object({
 })
 
 export type PaymentRequestInput = z.infer<typeof PaymentRequestSchema>
+

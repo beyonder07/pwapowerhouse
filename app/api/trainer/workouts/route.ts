@@ -12,6 +12,18 @@ export async function GET(req: NextRequest) {
     const auth = await authenticateRequest(req)
     const data = await new TrainerPanelService(auth).getWorkouts()
 
+    // Debug log members to a file in workspace
+    try {
+      const fs = require("fs")
+      fs.writeFileSync("d:\\web development\\pwapowerhouse\\workouts_debug.json", JSON.stringify({
+        trainer: { id: auth.authUserId, role: auth.role, gymId: auth.user.gymId },
+        members: data.members,
+        plans: data.plans
+      }, null, 2))
+    } catch (e) {
+      // ignore
+    }
+
     return ok(data)
   } catch (error) {
     return fail(error)

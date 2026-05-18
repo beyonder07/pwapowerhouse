@@ -39,7 +39,7 @@ export class DashboardService {
           id,
           amount,
           created_at,
-          users (id, name)
+          users!payments_user_id_fkey (id, name)
         `)
         .eq("gym_id", gymId)
         .eq("status", "pending")

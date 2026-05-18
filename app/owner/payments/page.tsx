@@ -15,6 +15,7 @@ interface OwnerPaymentRow {
   status: string
   paymentMode: "upi" | "cash"
   screenshotUrl?: string
+  startDate?: string
   createdAt: string
   approvedAt?: string | null
 }
@@ -43,6 +44,47 @@ export default function OwnerPaymentsPage() {
   const [data, setData] = useState<OwnerPaymentsData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [editedDates, setEditedDates] = useState<Record<string, { planStartDate: string; paymentDate: string }>>({})
+  // new state for editable amount and plan duration per payment
+  const [editedValues, setEditedValues] = useState<Record<string, { amount?: string; planDuration?: string }>>({})
+
+  const getDatesForPayment = (payment: OwnerPaymentRow) => {
+    if (editedDates[payment.id]) {
+      return editedDates[payment.id]
+    }
+    const planStartDate = payment.startDate || new Date().toISOString().split("T")[0]
+    const paymentDate = (payment as any).paymentDate || new Date().toISOString().split("T")[0]
+    return { planStartDate, paymentDate }
+  }
+
+  const setDateValue = (paymentId: string, field: "planStartDate" | "paymentDate", value: string) => {
+    setEditedDates(prev => {
+      const current = prev[paymentId] || {
+        planStartDate: data?.pending.find(p => p.id === paymentId)?.startDate || new Date().toISOString().split("T")[0],
+        paymentDate: (data?.pending.find(p => p.id === paymentId) as any)?.paymentDate || new Date().toISOString().split("T")[0]
+      }
+      return {
+        ...prev,
+        [paymentId]: {
+          ...current,
+          [field]: value
+        }
+      }
+    })
+  }
+
+  const setValue = (paymentId: string, field: "amount" | "planDuration", value: string) => {
+    setEditedValues(prev => {
+      const current = prev[paymentId] || {}
+      return {
+        ...prev,
+        [paymentId]: {
+          ...current,
+          [field]: value
+        }
+      }
+    })
+  }
 
   const totals = useMemo(() => {
     const pending = data?.pending ?? []
@@ -85,11 +127,17 @@ export default function OwnerPaymentsPage() {
     setUpdatingId(id)
 
     try {
+      const dates = editedDates[id]
       const response = await fetch("/api/owner/payments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ 
+          id, 
+          status,
+          planStartDate: status === "approved" ? (dates?.planStartDate || data?.pending.find(p => p.id === id)?.startDate || new Date().toISOString().split("T")[0]) : undefined,
+          paymentDate: status === "approved" ? (dates?.paymentDate || (data?.pending.find(p => p.id === id) as any)?.paymentDate || new Date().toISOString().split("T")[0]) : undefined
+        }),
       })
       const result = await response.json()
 
@@ -156,10 +204,10 @@ export default function OwnerPaymentsPage() {
               <div className="space-y-3">
                 {data.pending.map((payment) => (
                   <SurfaceCard key={payment.id} className="p-4 group">
-                    <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-start justify-between gap-4 mb-3">
                       <div>
                         <p className="font-bold text-lg text-foreground leading-tight">{payment.memberName}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
                           <span className={cn(
                             "px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter flex items-center gap-1",
                             payment.paymentMode === "upi" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
@@ -178,7 +226,29 @@ export default function OwnerPaymentsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-border/50">
+                    {/* Editable Dates for Owner Override */}
+                    <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/30 text-xs my-3 bg-secondary/10 p-3 rounded-lg">
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground block">Plan Start Date:</label>
+                        <input
+                          type="date"
+                          value={getDatesForPayment(payment).planStartDate}
+                          onChange={(e) => setDateValue(payment.id, "planStartDate", e.target.value)}
+                          className="w-full bg-background border border-border/40 rounded px-2 py-1 text-foreground font-semibold focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground block">Payment Date:</label>
+                        <input
+                          type="date"
+                          value={getDatesForPayment(payment).paymentDate}
+                          onChange={(e) => setDateValue(payment.id, "paymentDate", e.target.value)}
+                          className="w-full bg-background border border-border/40 rounded px-2 py-1 text-foreground font-semibold focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-border/50">
                       {payment.screenshotUrl && (
                         <Button 
                           variant="secondary" 
@@ -235,22 +305,30 @@ export default function OwnerPaymentsPage() {
                 {data.history.map((payment) => (
                   <div
                     key={payment.id}
-                    className="flex items-center justify-between gap-4 p-4 rounded-xl border border-border bg-card/30 hover:bg-card/50 transition-colors"
+                    className="flex flex-col gap-2 p-4 rounded-xl border border-border bg-card/30 hover:bg-card/50 transition-colors"
                   >
-                    <div>
-                      <p className="font-bold text-foreground">{payment.memberName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(payment.amount)} • {payment.paymentMode.toUpperCase()}
-                      </p>
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-bold text-foreground">{payment.memberName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {formatCurrency(payment.amount)} • {payment.paymentMode.toUpperCase()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {payment.screenshotUrl && (
+                          <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-secondary/50 text-muted-foreground hover:text-primary transition-colors">
+                            <Eye className="h-4 w-4" />
+                          </a>
+                        )}
+                        <StatusPill status={payment.status} size="sm" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      {payment.screenshotUrl && (
-                        <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="p-2 rounded-lg bg-secondary/50 text-muted-foreground hover:text-primary transition-colors">
-                          <Eye className="h-4 w-4" />
-                        </a>
-                      )}
-                      <StatusPill status={payment.status} size="sm" />
-                    </div>
+                    {payment.status === "approved" && (
+                      <div className="flex items-center gap-4 pt-2 border-t border-border/20 text-[10px] text-muted-foreground">
+                        <span><strong className="text-foreground/75">Plan Start:</strong> {payment.startDate ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(payment.startDate)) : "N/A"}</span>
+                        <span><strong className="text-foreground/75">Paid Date:</strong> {(payment as any).paymentDate ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date((payment as any).paymentDate)) : "N/A"}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

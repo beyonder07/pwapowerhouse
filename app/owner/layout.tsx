@@ -40,6 +40,7 @@ export default function OwnerLayout({
   children: React.ReactNode
 }) {
   const [pendingCount, setPendingCount] = useState(0)
+  const [navItems, setNavItems] = useState(OWNER_NAV_ITEMS)
 
   useEffect(() => {
     async function loadPending() {
@@ -56,6 +57,17 @@ export default function OwnerLayout({
           (requestsJson.data?.membershipRequests?.length ?? 0) +
           (requestsJson.data?.trainerApplications?.length ?? 0)
         const paymentCount = paymentsJson.data?.pending?.length ?? 0
+
+        setNavItems(prev => prev.map(item => {
+          if (item.label === "Requests") {
+            return { ...item, badge: requestCount }
+          }
+          if (item.label === "Payments") {
+            return { ...item, badge: paymentCount }
+          }
+          return item
+        }))
+
         setPendingCount(requestCount + paymentCount)
       } catch {
         setPendingCount(0)
@@ -67,7 +79,7 @@ export default function OwnerLayout({
   return (
     <AuthenticatedShell
       role="owner"
-      navItems={OWNER_NAV_ITEMS}
+      navItems={navItems}
       footerItems={OWNER_FOOTER_ITEMS}
       pendingCount={pendingCount}
     >

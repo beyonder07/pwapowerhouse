@@ -7,6 +7,7 @@ import {
   NotFoundError,
 } from "@/src/utils/errors"
 import type { PaymentRequestInput } from "./client.schema"
+import { parsePaymentDates, encodePaymentDates } from "@/src/utils/payment-dates"
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -181,25 +182,35 @@ export class ClientService {
         endDate: membershipRes.data.end_date,
         daysRemaining: Math.max(0, Math.ceil((new Date(membershipRes.data.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
       } : null,
-      pendingRequest: pendingRes.data ? {
-        id: pendingRes.data.id,
-        amount: pendingRes.data.amount,
-        status: pendingRes.data.status,
-        planDuration: pendingRes.data.plan_duration,
-        paymentMode: pendingRes.data.payment_mode,
-        screenshotUrl: pendingRes.data.screenshot_url,
-        createdAt: pendingRes.data.created_at
-      } : null,
-      history: (historyRes.data ?? []).map(p => ({
-        id: p.id,
-        amount: p.amount,
-        status: p.status,
-        planDuration: p.plan_duration,
-        paymentMode: p.payment_mode,
-        screenshotUrl: p.screenshot_url,
-        createdAt: p.created_at,
-        approvedAt: p.approved_at
-      }))
+      pendingRequest: pendingRes.data ? (() => {
+        const parsed = parsePaymentDates(pendingRes.data.screenshot_url, pendingRes.data.created_at)
+        return {
+          id: pendingRes.data.id,
+          amount: pendingRes.data.amount,
+          status: pendingRes.data.status,
+          planDuration: pendingRes.data.plan_duration,
+          paymentMode: pendingRes.data.payment_mode,
+          screenshotUrl: parsed.screenshotUrl || undefined,
+          startDate: parsed.planStartDate,
+          paymentDate: parsed.paymentDate,
+          createdAt: pendingRes.data.created_at
+        }
+      })() : null,
+      history: (historyRes.data ?? []).map(p => {
+        const parsed = parsePaymentDates(p.screenshot_url, p.created_at)
+        return {
+          id: p.id,
+          amount: p.amount,
+          status: p.status,
+          planDuration: p.plan_duration,
+          paymentMode: p.payment_mode,
+          screenshotUrl: parsed.screenshotUrl || undefined,
+          startDate: parsed.planStartDate,
+          paymentDate: parsed.paymentDate,
+          createdAt: p.created_at,
+          approvedAt: p.approved_at
+        }
+      })
     }
   }
 
@@ -216,6 +227,13 @@ export class ClientService {
       throw new ForbiddenError("Please assign yourself to a gym branch first")
     }
 
+    const encodedScreenshotUrl = encodePaymentDates(
+      input.screenshotUrl,
+      input.startDate || new Date().toISOString().split("T")[0],
+      input.paymentDate || new Date().toISOString().split("T")[0],
+      input.paymentMode
+    )
+
     const { data, error } = await this.ctx.supabase
       .from("payments")
       .insert({
@@ -224,7 +242,7 @@ export class ClientService {
         amount: input.amount,
         plan_duration: input.planDuration,
         payment_mode: input.paymentMode,
-        screenshot_url: input.screenshotUrl,
+        screenshot_url: encodedScreenshotUrl,
         status: "pending"
       })
       .select("*")

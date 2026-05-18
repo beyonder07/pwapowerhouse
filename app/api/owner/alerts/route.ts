@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     let inactiveQuery = admin.from("users").select("id, name").eq("role", "client").limit(200)
     let pendingPaymentsQuery = admin
       .from("payments")
-      .select("id, amount, users!inner(name)")
+      .select("id, amount, users!payments_user_id_fkey!inner(name)")
       .eq("status", "pending")
       .order("created_at", { ascending: true })
     let todayCheckInsQuery = admin

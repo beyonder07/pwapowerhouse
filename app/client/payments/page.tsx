@@ -15,11 +15,6 @@ import {
 } from "@/components/ui/select"
 import { PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
 import { cn } from "@/lib/utils"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 interface PaymentRow {
   id: string
@@ -70,6 +65,8 @@ export default function ClientPaymentsPage() {
   const [data, setData] = useState<PaymentsData | null>(null)
   const [amount, setAmount] = useState("2500")
   const [planDuration, setPlanDuration] = useState("30")
+  const [startDate, setStartDate] = useState(() => new Date().toISOString().split("T")[0])
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split("T")[0])
   const [paymentMode, setPaymentMode] = useState<"upi" | "cash">("upi")
   const [screenshotUrl, setScreenshotUrl] = useState("")
   const [isUploading, setIsUploading] = useState(false)
@@ -126,27 +123,21 @@ export default function ClientPaymentsPage() {
 
     setIsUploading(true)
     try {
-      // 1. Get User ID for secure path (Required by new SQL policy)
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      if (authError || !user) throw new Error("Auth required for upload")
+      const formData = new FormData()
+      formData.append("file", file)
 
-      const fileExt = file.name.split(".").pop()
-      const fileName = `${Math.random()}-${Date.now()}.${fileExt}`
-      
-      // Anti-Gravity: Using secure path 'payments/{userId}/{filename}' matching SQL policy
-      const filePath = `payments/${user.id}/${fileName}`
+      const response = await fetch("/api/client/payments/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      })
+      const result = await response.json()
 
-      const { error: uploadError } = await supabase.storage
-        .from("profile-images")
-        .upload(filePath, file)
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Unable to upload payment screenshot")
+      }
 
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("profile-images")
-        .getPublicUrl(filePath)
-
-      setScreenshotUrl(publicUrl)
+      setScreenshotUrl(result.data.publicUrl)
       toast.success("Screenshot uploaded successfully")
     } catch (error: any) {
       toast.error("Upload failed", { description: error.message })
@@ -174,7 +165,9 @@ export default function ClientPaymentsPage() {
           amount: Number(amount),
           planDuration: Number(planDuration),
           paymentMode,
-          screenshotUrl: paymentMode === "upi" ? screenshotUrl : undefined
+          screenshotUrl: paymentMode === "upi" ? screenshotUrl : undefined,
+          startDate,
+          paymentDate
         }),
       })
       const result = await response.json()
@@ -308,6 +301,19 @@ export default function ClientPaymentsPage() {
                     <p className="text-xs text-muted-foreground">Submitted on {formatDate(data.pendingRequest.createdAt)}</p>
                   </div>
                 </div>
+                
+                {/* Custom Dates Display */}
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/30 text-sm">
+                  <div>
+                    <span className="text-xs text-muted-foreground font-semibold">Plan Start Date:</span>
+                    <p className="font-bold text-foreground mt-0.5">{formatDate((data.pendingRequest as any).startDate)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground font-semibold">Payment Date:</span>
+                    <p className="font-bold text-foreground mt-0.5">{formatDate((data.pendingRequest as any).paymentDate)}</p>
+                  </div>
+                </div>
+
                 {data.pendingRequest.screenshotUrl && (
                   <div className="pt-4 border-t border-border/50">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-2">Payment Proof</p>
@@ -320,7 +326,7 @@ export default function ClientPaymentsPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid gap-6 md:grid-cols-3">
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
                   {/* Mode Selection */}
                   <div className="space-y-2">
                     <Label>Payment Mode</Label>
@@ -359,14 +365,14 @@ export default function ClientPaymentsPage() {
                       value={amount}
                       onChange={(event) => setAmount(event.target.value)}
                       required
-                      className="font-bold text-lg"
+                      className="font-bold text-lg bg-background"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label>Plan Duration</Label>
                     <Select value={planDuration} onValueChange={setPlanDuration}>
-                      <SelectTrigger className="font-semibold">
+                      <SelectTrigger className="font-semibold w-full bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -377,6 +383,30 @@ export default function ClientPaymentsPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Plan Start Date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      required
+                      className="font-semibold text-foreground bg-background"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentDate">Payment Date</Label>
+                    <Input
+                      id="paymentDate"
+                      type="date"
+                      value={paymentDate}
+                      onChange={(event) => setPaymentDate(event.target.value)}
+                      required
+                      className="font-semibold text-foreground bg-background"
+                    />
                   </div>
                 </div>
 
@@ -421,7 +451,7 @@ export default function ClientPaymentsPage() {
                   </div>
                 )}
 
-                <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={isSubmitting || isUploading}>
+                <Button type="submit" size="lg" className="w-full sm:w-auto font-bold" disabled={isSubmitting || isUploading}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -465,10 +495,20 @@ export default function ClientPaymentsPage() {
                       <p className="text-sm text-muted-foreground">
                         {payment.planDuration} days plan - Requested {formatDate(payment.createdAt)}
                       </p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground bg-secondary/10 p-2 rounded border border-border/40 inline-flex">
+                        <div>
+                          <span className="font-semibold text-foreground/80">Plan Start:</span> {formatDate((payment as any).startDate)}
+                        </div>
+                        <div className="border-l border-border/50 pl-4">
+                          <span className="font-semibold text-foreground/80">Paid Date:</span> {formatDate((payment as any).paymentDate)}
+                        </div>
+                      </div>
                       {payment.screenshotUrl && (
-                        <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="inline-block mt-2 text-[10px] font-bold text-primary hover:underline uppercase tracking-wider">
-                          View Receipt
-                        </a>
+                        <div className="mt-2">
+                          <a href={payment.screenshotUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider">
+                            View Receipt
+                          </a>
+                        </div>
                       )}
                     </div>
                     <div className="flex flex-col sm:items-end gap-2">

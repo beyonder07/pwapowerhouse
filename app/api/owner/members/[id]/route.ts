@@ -122,3 +122,73 @@ export async function GET(
     return fail(error)
   }
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const auth = await authenticateRequest(req)
+    requireRole(auth, ["owner"])
+    const { id } = await params
+
+    const body = await req.json()
+    const { startDate, endDate } = body
+
+    if (!startDate || !endDate) {
+      return fail(new Error("Start date and End date are required"))
+    }
+
+    // 1. Fetch user to check gym_id
+    const { data: user, error: userError } = await admin
+      .from("users")
+      .select("gym_id")
+      .eq("id", id)
+      .maybeSingle()
+
+    if (userError || !user) {
+      return fail(new Error("Member not found"))
+    }
+
+    // 2. Try to fetch existing membership
+    const { data: existingMembership } = await admin
+      .from("memberships")
+      .select("id")
+      .eq("user_id", id)
+      .maybeSingle()
+
+    let error;
+    if (existingMembership) {
+      // Update
+      const res = await admin
+        .from("memberships")
+        .update({
+          start_date: startDate,
+          end_date: endDate,
+          status: "active"
+        })
+        .eq("user_id", id)
+      error = res.error
+    } else {
+      // Insert
+      const res = await admin
+        .from("memberships")
+        .insert({
+          user_id: id,
+          gym_id: user.gym_id,
+          start_date: startDate,
+          end_date: endDate,
+          status: "active"
+        })
+      error = res.error
+    }
+
+    if (error) {
+      return fail(error)
+    }
+
+    return ok({ success: true })
+  } catch (error) {
+    return fail(error)
+  }
+}

@@ -30,7 +30,12 @@ export function MobileNav({ navItems, pendingCount, hidden = false, className }:
     pathname === href || (href.split("/").length > 2 && pathname.startsWith(href))
 
   const showBadge = (item: NavItem) =>
-    item.label === "Requests" && pendingCount && pendingCount > 0
+    typeof item.badge === "number"
+      ? item.badge > 0
+      : (item.label === "Requests" && pendingCount && pendingCount > 0)
+
+  const getBadgeCount = (item: NavItem) =>
+    typeof item.badge === "number" ? item.badge : pendingCount
 
   return (
     <>
@@ -57,7 +62,7 @@ export function MobileNav({ navItems, pendingCount, hidden = false, className }:
                       <item.icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
                       {showBadge(item) && (
                         <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1">
-                          {pendingCount}
+                          {getBadgeCount(item)}
                         </span>
                       )}
                     </div>
@@ -97,7 +102,7 @@ export function MobileNav({ navItems, pendingCount, hidden = false, className }:
                     <item.icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground/70")} />
                     {showBadge(item) && (
                       <span className="absolute -top-1 -right-1 h-3.5 min-w-3.5 flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[9px] font-semibold px-0.5">
-                        {pendingCount}
+                        {getBadgeCount(item)}
                       </span>
                     )}
                   </div>

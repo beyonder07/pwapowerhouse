@@ -2,9 +2,11 @@ import type { AuthContext } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
 import { getOwnerGymId } from "@/src/utils/owner-gym"
 import { BadRequestError, NotFoundError } from "@/src/utils/errors"
-import { z } from "zod"
+import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
+import { parsePaymentDates, encodePaymentDates } from "@/src/utils/payment-dates"
 
 export class PaymentApprovalService {
+  private readonly admin = createSupabaseServiceRoleClient()
   constructor(private readonly ctx: AuthContext) {}
 
   /**
@@ -14,15 +16,15 @@ export class PaymentApprovalService {
     requireRole(this.ctx, ["owner"])
     const ownerGymId = getOwnerGymId(this.ctx)
 
-    let pendingQuery = this.ctx.supabase
+    let pendingQuery = this.admin
       .from("payments")
-      .select("*, users(name)")
+      .select("*, users!payments_user_id_fkey(name)")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
 
-    let historyQuery = this.ctx.supabase
+    let historyQuery = this.admin
       .from("payments")
-      .select("*, users(name)")
+      .select("*, users!payments_user_id_fkey(name)")
       .neq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(20)
@@ -34,17 +36,22 @@ export class PaymentApprovalService {
 
     const [pendingRes, historyRes] = await Promise.all([pendingQuery, historyQuery])
 
-    const mapper = (p: any) => ({
-      id: p.id,
-      memberName: p.users?.name || "Unknown",
-      amount: p.amount,
-      planDuration: p.plan_duration,
-      status: p.status,
-      paymentMode: p.payment_mode,
-      screenshotUrl: p.screenshot_url,
-      createdAt: p.created_at,
-      approvedAt: p.approved_at
-    })
+    const mapper = (p: any) => {
+      const parsed = parsePaymentDates(p.screenshot_url, p.created_at)
+      return {
+        id: p.id,
+        memberName: p.users?.name || "Unknown",
+        amount: p.amount,
+        planDuration: p.plan_duration,
+        status: p.status,
+        paymentMode: p.payment_mode,
+        screenshotUrl: parsed.screenshotUrl || undefined,
+        startDate: parsed.planStartDate,
+        paymentDate: parsed.paymentDate,
+        createdAt: p.created_at,
+        approvedAt: p.approved_at
+      }
+    }
 
     return {
       pending: (pendingRes.data || []).map(mapper),
@@ -55,19 +62,19 @@ export class PaymentApprovalService {
   /**
    * Unified Review: Approve or Reject
    */
-  async review(input: { id: string, status: "approved" | "rejected" }) {
+  async review(input: { id: string, status: "approved" | "rejected", planStartDate?: string, paymentDate?: string }) {
     if (input.status === "approved") {
-      return this.approve(input.id)
+      return this.approve(input.id, input.planStartDate, input.paymentDate)
     } else {
       return this.reject(input.id)
     }
   }
 
-  async approve(paymentId: string) {
+  async approve(paymentId: string, customPlanStartDate?: string, customPaymentDate?: string) {
     requireRole(this.ctx, ["owner"])
 
     // 1. Fetch the pending payment
-    const { data: payment, error: fetchError } = await this.ctx.supabase
+    const { data: payment, error: fetchError } = await this.admin
       .from("payments")
       .select("*")
       .eq("id", paymentId)
@@ -78,39 +85,60 @@ export class PaymentApprovalService {
       throw new NotFoundError("Pending payment request not found")
     }
 
-    // 2. Update payment status
-    const { error: updatePaymentError } = await this.ctx.supabase
+    // Parse the original dates from screenshot_url
+    const parsed = parsePaymentDates(payment.screenshot_url, payment.created_at)
+    
+    // Override with custom dates if provided by the owner
+    const finalPlanStartDate = customPlanStartDate || parsed.planStartDate
+    const finalPaymentDate = customPaymentDate || parsed.paymentDate
+
+    // Re-encode dates back into screenshot_url to persist the edited dates!
+    const updatedScreenshotUrl = encodePaymentDates(
+      payment.screenshot_url,
+      finalPlanStartDate,
+      finalPaymentDate,
+      payment.payment_mode
+    )
+
+    // 2. Update payment status & encoded dates in screenshot_url
+    const { error: updatePaymentError } = await this.admin
       .from("payments")
       .update({
         status: "approved",
         approved_at: new Date().toISOString(),
         approved_by: this.ctx.user.id,
+        screenshot_url: updatedScreenshotUrl
       })
       .eq("id", paymentId)
 
     if (updatePaymentError) throw updatePaymentError
 
-    // 3. Update or Create Membership
-    const { data: existingMembership } = await this.ctx.supabase
+    // 3. Update or Create Membership using finalPlanStartDate
+    const { data: existingMembership } = await this.admin
       .from("memberships")
       .select("*")
       .eq("user_id", payment.user_id)
       .maybeSingle()
 
     const durationDays = payment.plan_duration || 30
-    let startDate = new Date()
-    let endDate = new Date()
+    let requestedStart = new Date(finalPlanStartDate)
+    if (isNaN(requestedStart.getTime())) {
+      requestedStart = new Date()
+    }
+
+    let startDate = new Date(requestedStart)
+    let endDate = new Date(requestedStart)
 
     if (existingMembership) {
       const currentEnd = new Date(existingMembership.end_date)
-      startDate = currentEnd > new Date() ? currentEnd : new Date()
+      startDate = currentEnd > requestedStart ? currentEnd : requestedStart
       endDate = new Date(startDate)
       endDate.setDate(startDate.getDate() + durationDays)
 
-      const { error: memError } = await this.ctx.supabase
+      const { error: memError } = await this.admin
         .from("memberships")
         .update({
-          start_date: startDate.toISOString().split("T")[0],
+          start_date: (currentEnd > requestedStart ? new Date(existingMembership.start_date) : startDate).toISOString().split("T")[0],
           end_date: endDate.toISOString().split("T")[0],
           status: "active",
         })
@@ -119,7 +147,7 @@ export class PaymentApprovalService {
       if (memError) throw memError
     } else {
       endDate.setDate(startDate.getDate() + durationDays)
-      const { error: memError } = await this.ctx.supabase
+      const { error: memError } = await this.admin
         .from("memberships")
         .insert({
           user_id: payment.user_id,
@@ -138,7 +166,7 @@ export class PaymentApprovalService {
   async reject(paymentId: string) {
     requireRole(this.ctx, ["owner"])
 
-    const { error } = await this.ctx.supabase
+    const { error } = await this.admin
       .from("payments")
       .update({ status: "rejected" })
       .eq("id", paymentId)

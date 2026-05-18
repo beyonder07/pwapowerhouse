@@ -75,7 +75,10 @@ export function Sidebar({
           {navItems.map((item) => {
             const isActive = pathname === item.href || 
               (item.href !== `/${role}` && pathname.startsWith(item.href))
-            const showBadge = item.label === "Requests" && pendingCount && pendingCount > 0
+            const showBadge = typeof item.badge === "number"
+              ? item.badge > 0
+              : (item.label === "Requests" && pendingCount && pendingCount > 0)
+            const badgeCount = typeof item.badge === "number" ? item.badge : pendingCount
 
             return (
               <li key={item.href}>
@@ -104,7 +107,7 @@ export function Sidebar({
                   )}
                   {!collapsed && showBadge && (
                     <span className="flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold">
-                      {pendingCount}
+                      {badgeCount}
                     </span>
                   )}
                   {collapsed && showBadge && (

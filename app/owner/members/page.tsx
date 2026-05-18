@@ -88,6 +88,7 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                 {/* Identity */}
                 <div className="flex items-center gap-3">
                   <Avatar className="h-14 w-14 shrink-0">
+                    {detail.avatarUrl && <AvatarImage src={detail.avatarUrl} alt={detail.name} />}
                     <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">{initials(detail.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
@@ -270,6 +271,7 @@ export default function OwnerMembersPage() {
                 {/* Mobile: stack vertically. Desktop: single row */}
                 <div className="flex items-center gap-3 overflow-hidden">
                   <Avatar className="h-10 w-10 shrink-0">
+                    {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.name} />}
                     <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials(m.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
