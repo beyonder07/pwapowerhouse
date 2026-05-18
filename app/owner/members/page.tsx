@@ -104,11 +104,11 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                 </div>
 
                 {/* Membership */}
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Membership</p>
+                <div className="mt-6">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Membership</p>
                   {detail.membership ? (
-                    <div className="rounded-xl border border-border bg-card p-3 space-y-3">
-                      <div className="flex justify-between items-center">
+                    <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
+                      <div className="flex justify-between items-center mb-2.5">
                         <StatusPill
                           status={detail.membership.daysLeft <= 0 ? "error" : detail.membership.daysLeft <= 14 ? "warning" : "success"}
                           label={detail.membership.daysLeft <= 0 ? "Expired" : detail.membership.daysLeft <= 14 ? "Expiring Soon" : "Active"} />
@@ -116,25 +116,20 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                           {detail.membership.daysLeft > 0 ? `${detail.membership.daysLeft}d left` : "Expired"}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg bg-background p-2.5">
-                          <p className="text-muted-foreground">Start</p>
-                          <p className="mt-0.5 font-semibold text-foreground">{formatDate(detail.membership.startDate)}</p>
-                        </div>
-                        <div className="rounded-lg bg-background p-2.5">
-                          <p className="text-muted-foreground">End</p>
-                          <p className="mt-0.5 font-semibold text-foreground">{formatDate(detail.membership.endDate)}</p>
-                        </div>
+                      <div className="flex items-center gap-2 text-sm text-foreground bg-background/50 rounded-lg p-2.5">
+                        <span className="font-semibold">{formatDate(detail.membership.startDate)}</span>
+                        <span className="text-muted-foreground/50 font-bold">→</</span>
+                        <span className="font-semibold">{formatDate(detail.membership.endDate)}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border p-3">No membership on record</p>
+                    <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-3 text-center">No membership on record</p>
                   )}
                 </div>
 
                 {/* Attendance stats */}
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Attendance</p>
+                <div className="mt-6">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Attendance</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: "Total visits", value: detail.attendance.total },
@@ -142,49 +137,47 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                       { label: "Current streak", value: `${detail.attendance.streak}d` },
                       { label: "Avg session", value: detail.attendance.avgDurationMinutes ? `${detail.attendance.avgDurationMinutes}m` : "N/A" },
                     ].map(stat => (
-                      <div key={stat.label} className="rounded-xl border border-border bg-card p-3">
-                        <p className="text-[10px] text-muted-foreground">{stat.label}</p>
-                        <p className="mt-0.5 text-lg font-bold text-foreground">{stat.value}</p>
+                      <div key={stat.label} className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
+                        <p className="text-[10px] font-medium text-muted-foreground/80">{stat.label}</p>
+                        <p className="mt-0.5 text-xl font-bold text-foreground leading-none">{stat.value}</p>
                       </div>
                     ))}
                   </div>
                   {detail.attendance.lastDate && (
-                    <p className="mt-2 text-xs text-muted-foreground">Last check-in: {formatDate(detail.attendance.lastDate)}</p>
+                    <p className="mt-2 text-[11px] font-medium text-muted-foreground text-right pr-1">Last check-in: {formatDate(detail.attendance.lastDate)}</p>
                   )}
                 </div>
 
                 {/* Workout Plan */}
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Workout Plan</p>
+                <div className="mt-6">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Workout Plan</p>
                   {detail.workoutPlan ? (
-                    <div className="rounded-xl border border-border bg-card p-3">
-                      <div className="mb-1 flex items-center justify-between">
+                    <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
+                      <div className="mb-2 flex items-center justify-between">
                         <p className="font-semibold text-foreground text-sm">{detail.workoutPlan.title}</p>
                         <StatusPill status={detail.workoutPlan.status === "active" ? "success" : "warning"} label={detail.workoutPlan.status} size="sm" />
                       </div>
-                      <div className="flex gap-2 text-xs text-muted-foreground">
+                      <div className="flex gap-2 text-xs font-medium text-muted-foreground/80 bg-background/50 rounded-lg p-2.5">
                         <span>{detail.workoutPlan.dayCount} days</span>
                         <span>·</span>
                         <span>{detail.workoutPlan.exerciseCount} exercises</span>
-                        <span>·</span>
-                        <span>Updated {formatDate(detail.workoutPlan.updatedAt)}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border p-3">No workout plan assigned</p>
+                    <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-3 text-center">No workout plan assigned</p>
                   )}
                 </div>
 
                 {/* Payments */}
                 {detail.payments.length > 0 && (
-                  <div>
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Payment History</p>
+                  <div className="mt-6">
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Payment History</p>
                     <div className="space-y-2">
                       {detail.payments.slice(0, 8).map(p => (
-                        <div key={p.id} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
+                        <div key={p.id} className="flex items-center justify-between rounded-xl border border-border bg-card shadow-sm px-3 py-2.5">
                           <div>
-                            <p className="text-sm font-medium text-foreground">{formatCurrency(p.amount)}</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(p.createdAt)} · {p.paymentMode}</p>
+                            <p className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</p>
+                            <p className="text-[11px] font-medium text-muted-foreground/80 mt-0.5">{formatDate(p.createdAt)} · {p.paymentMode}</p>
                           </div>
                           <StatusPill status={paymentTone(p.status)} label={p.status} size="sm" />
                         </div>
@@ -193,8 +186,8 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                   </div>
                 )}
 
-                {/* Safe area spacer for home indicator */}
-                <div className="h-4" />
+                {/* Safe area spacer for home indicator and nav padding */}
+                <div className="h-24 md:h-8" />
               </>
             )}
           </div>

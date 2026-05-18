@@ -162,102 +162,111 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
   }, [trainerId])
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <div className="fixed inset-0 z-50" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex h-full w-full max-w-[500px] flex-col overflow-hidden border-l border-border bg-background shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border bg-card px-5 py-4">
+
+      {/* Panel — full-screen on mobile, right-side panel on md+ */}
+      <div className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
+        {/* Handle bar (mobile only) */}
+        <div className="flex justify-center pt-3 pb-1 md:hidden">
+          <div className="h-1 w-10 rounded-full bg-border" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-base font-bold text-foreground">Operational Profile</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-6">
-          {loading ? (
-            <div className="flex h-48 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : !detail ? (
-            <p className="text-sm text-muted-foreground">Profile unavailable.</p>
-          ) : (
-            <>
-              {/* Identity */}
-              <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16 shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">{initials(detail.name)}</AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-xl font-black text-foreground">{detail.name}</h3>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {detail.specialization && <span className="font-semibold text-primary">{detail.specialization}</span>}
-                    {detail.experience && <span>· {detail.experience} exp</span>}
-                  </div>
-                  {detail.floorTiming.startLabel && (
-                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-[10px] font-bold text-foreground">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      Expected: {detail.floorTiming.startLabel} - {detail.floorTiming.endLabel}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className="space-y-6 p-4 pb-safe">
+            {loading ? (
+              <div className="flex h-48 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : !detail ? (
+              <p className="text-sm text-muted-foreground">Profile unavailable.</p>
+            ) : (
+              <>
+                {/* Identity */}
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-14 w-14 shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">{initials(detail.name)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-base font-bold text-foreground truncate">{detail.name}</h3>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-medium text-muted-foreground">
+                      {detail.specialization && <span className="font-semibold text-primary">{detail.specialization}</span>}
+                      {detail.experience && <span>· {detail.experience} exp</span>}
                     </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Smart Insights */}
-              {detail.attendance.insights.length > 0 && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-amber-500">
-                    <AlertCircle className="h-4 w-4" />
-                    <p className="text-xs font-bold uppercase tracking-widest">Operational Alerts</p>
-                  </div>
-                  <ul className="space-y-1.5 pl-6 text-sm text-foreground list-disc marker:text-amber-500">
-                    {detail.attendance.insights.map((insight, i) => (
-                      <li key={i}>{insight}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Attendance Analytics Matrix */}
-              <div>
-                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Performance Metrics</p>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-border bg-card p-3 text-center">
-                    <p className="text-2xl font-black text-emerald-500">{detail.attendance.attendanceRate}%</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rate</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-3 text-center">
-                    <p className="text-2xl font-black text-foreground">{detail.attendance.presentDays}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Present</p>
-                  </div>
-                  <div className={`rounded-xl border border-border bg-card p-3 text-center ${detail.attendance.absentDays > 0 ? "border-red-500/30 bg-red-500/5" : ""}`}>
-                    <p className={`text-2xl font-black ${detail.attendance.absentDays > 0 ? "text-red-500" : "text-foreground"}`}>{detail.attendance.absentDays}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Absent</p>
-                  </div>
-                  <div className={`rounded-xl border border-border bg-card p-3 text-center ${detail.attendance.lateDays > 0 ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
-                    <p className={`text-2xl font-black ${detail.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground"}`}>{detail.attendance.lateDays}</p>
-                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Late</p>
+                    {detail.floorTiming.startLabel && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-[10px] font-bold text-foreground">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        Expected: {detail.floorTiming.startLabel} - {detail.floorTiming.endLabel}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Avg In Time</p>
-                      <p className="font-bold text-foreground">{detail.attendance.avgCheckIn ?? "—"}</p>
+                {/* Smart Insights */}
+                {detail.attendance.insights.length > 0 && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm">
+                    <div className="mb-2 flex items-center gap-2 text-amber-500">
+                      <AlertCircle className="h-4 w-4" />
+                      <p className="text-[10px] font-bold uppercase tracking-widest">Operational Alerts</p>
                     </div>
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <ul className="space-y-1 pl-5 text-sm text-foreground list-disc marker:text-amber-500">
+                      {detail.attendance.insights.map((insight, i) => (
+                        <li key={i}>{insight}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Hours</p>
-                      <p className="font-bold text-foreground">{detail.attendance.totalHoursWorked ?? "—"}</p>
+                )}
+
+                {/* Attendance Analytics Matrix */}
+                <div>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Performance Metrics</p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Rate</p>
+                      <p className="mt-0.5 text-xl font-bold text-emerald-500 leading-none text-center">{detail.attendance.attendanceRate}%</p>
                     </div>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Present</p>
+                      <p className="mt-0.5 text-xl font-bold text-foreground leading-none text-center">{detail.attendance.presentDays}</p>
+                    </div>
+                    <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${detail.attendance.absentDays > 0 ? "border-red-500/30 bg-red-500/5" : ""}`}>
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Absent</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${detail.attendance.absentDays > 0 ? "text-red-500" : "text-foreground"}`}>{detail.attendance.absentDays}</p>
+                    </div>
+                    <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${detail.attendance.lateDays > 0 ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Late</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${detail.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground"}`}>{detail.attendance.lateDays}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Avg In Time</p>
+                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.avgCheckIn ?? "—"}</p>
+                      </div>
+                      <Clock className="h-4 w-4 text-muted-foreground/50" />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Total Hours</p>
+                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.totalHoursWorked ?? "—"}</p>
+                      </div>
+                      <TrendingUp className="h-4 w-4 text-muted-foreground/50" />
+                    </div>
                   </div>
                 </div>
-              </div>
 
               {/* Attendance Log */}
-              <div className="rounded-xl border border-border bg-card p-1">
+              <div className="rounded-xl border border-border bg-card p-1 shadow-sm">
                 <div className="px-4 py-3 pb-2 border-b border-border">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Daily Log</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Daily Log</p>
                 </div>
                 <div className="p-4">
                   <RichCalendar calendar={detail.attendance.calendar} />
@@ -266,12 +275,12 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
 
               {/* Clients */}
               {detail.clients.length > 0 && (
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Active Clients ({detail.clients.length})</p>
+                <div className="mt-6">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Active Clients ({detail.clients.length})</p>
                   <div className="space-y-1.5">
                     {detail.clients.map(c => (
-                      <div key={c.id} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                         <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      <div key={c.id} className="flex items-center justify-between rounded-xl border border-border bg-card shadow-sm px-3 py-2.5">
+                         <p className="text-sm font-semibold text-foreground">{c.name}</p>
                         <StatusPill status={planTone(c.planStatus)} label={c.planStatus} size="sm" />
                       </div>
                     ))}
@@ -281,14 +290,14 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
 
               {/* Govt ID */}
               {detail.govtIdUrl && (
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Verification</p>
-                  <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+                <div className="mt-6">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Verification</p>
+                  <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 shadow-sm">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-emerald-500" />
                       <div>
                         <p className="text-sm font-semibold text-foreground">{detail.govtIdType ?? "Government ID"}</p>
-                        <p className="text-xs text-emerald-500">Verified</p>
+                        <p className="text-[11px] font-bold text-emerald-500 mt-0.5">Verified</p>
                       </div>
                     </div>
                     <a href={detail.govtIdUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-primary hover:underline">View</a>
