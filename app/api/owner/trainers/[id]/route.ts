@@ -26,8 +26,8 @@ export async function GET(
 
     const [userRes, detailsRes, attendanceRes, salaryRes] = await Promise.all([
       admin.from("users").select("id,name,email,gym_id,created_at").eq("id", id).maybeSingle(),
-      admin.from("user_details").select("phone,profile_pic_url,profile_photo_url,specialization,experience,govt_id_url,govt_id_type").eq("user_id", id).maybeSingle(),
-      admin.from("attendance").select("date,check_in_time,check_out_time,distance_meters").eq("user_id", id).gte("date", monthStart).order("date", { ascending: false }),
+      admin.from("user_details").select("phone,profile_pic_url,profile_photo_url,specialization,experience,govt_id_url,govt_id_type,floor_start_time,floor_end_time").eq("user_id", id).maybeSingle(),
+      admin.from("attendance").select("date,check_in_time,check_out_time,status,distance_meters").eq("user_id", id).gte("date", monthStart).order("date", { ascending: false }),
       admin.from("trainer_salaries").select("id,base_salary,bonus,status,paid_at,month_start").eq("user_id", id).order("month_start", { ascending: false }).limit(6),
     ])
 
@@ -36,12 +36,22 @@ export async function GET(
     // Attendance calendar for this month
     const attendance = attendanceRes.data ?? []
     const presentDays = attendance.length
-    const lateDays = attendance.filter(a => {
+    const lateDays = attendance.filter((a) => {
       if (!a.check_in_time) return false
-      const h = new Date(a.check_in_time).getHours()
-      const m = new Date(a.check_in_time).getMinutes()
-      const mins = h * 60 + m
-      return (mins >= 305 && mins < 360) || (mins >= 965 && mins < 1020) // 5:05-6 or 4:05-5
+      if (a.status === "late") return true
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Asia/Kolkata",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).formatToParts(new Date(a.check_in_time))
+      const values = Object.fromEntries(parts.map((p) => [p.type, p.value]))
+      const mins = Number(values.hour) * 60 + Number(values.minute)
+      const inMorning = mins >= 360 && mins <= 600
+      const inEvening = mins >= 960 && mins <= 1320
+      if (inMorning) return mins > 360
+      if (inEvening) return mins > 960
+      return false
     }).length
 
     const workingDays = now.getDate() // days elapsed in month

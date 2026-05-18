@@ -10,7 +10,6 @@ export const TrainerMemberQuerySchema = z.object({
 
 export const TrainerAttendanceCheckInSchema = z
   .object({
-    session: z.enum(["morning", "evening"]).optional(),
     action: z.enum(["check_in", "check_out"]).default("check_in"),
     latitude: z.number().min(-90).max(90).optional(),
     longitude: z.number().min(-180).max(180).optional(),

@@ -7,6 +7,18 @@ import {
   ConflictError,
   ForbiddenError,
 } from "@/src/utils/errors"
+import {
+  deriveCheckoutStatus,
+  formatWorkDuration,
+  isCheckInLate,
+  normalizeStoredDay,
+  operatingWindowsForDisplay,
+  resolveCheckInWindow,
+  type DailyAttendanceStatus,
+  formatFloorTimeLabel,
+  type StoredDailyAttendance,
+  type TrainerFloorTiming,
+} from "./daily-attendance"
 import { TrainerAttendanceCheckInSchema } from "./trainer.schema"
 import type {
   TrainerAttendanceCheckInInput,
@@ -27,37 +39,8 @@ type AttendanceActivity =
   | "recent"
   | "inactive"
   | "no_attendance"
-type AttendanceStatus = "present" | "late" | "absent" | "not_marked"
 type SalaryStatus = "paid" | "processing" | "pending"
-type SessionKey = "morning" | "evening"
-type SessionAction = "check_in" | "check_out"
-
-const ATTENDANCE_SESSIONS: Record<
-  SessionKey,
-  {
-    label: string
-    windowLabel: string
-    startMinutes: number
-    lateAfterMinutes: number
-    endMinutes: number
-  }
-> = {
-  morning: {
-    label: "Morning Session",
-    windowLabel: "5:00 AM - 11:00 AM",
-    startMinutes: 5 * 60,
-    lateAfterMinutes: 5 * 60 + 10,
-    endMinutes: 11 * 60,
-  },
-  evening: {
-    label: "Evening Session",
-    windowLabel: "4:00 PM - 10:00 PM",
-    startMinutes: 16 * 60,
-    lateAfterMinutes: 16 * 60 + 10,
-    endMinutes: 22 * 60,
-  },
-}
-const SESSION_KEYS: SessionKey[] = ["morning", "evening"]
+type DailyAttendanceAction = "check_in" | "check_out"
 
 interface LiveUserRow {
   id: string
@@ -93,18 +76,6 @@ interface AttendanceRow {
   distance_meters?: number | string | null
 }
 
-interface StoredSessionRecord {
-  session: SessionKey
-  status: "present" | "late"
-  checkInAt: string
-  checkOutAt: string | null
-  gpsVerified: boolean
-}
-
-interface StoredAttendanceDay {
-  date: string
-  sessions: Partial<Record<SessionKey, StoredSessionRecord>>
-}
 
 interface GymRow {
   id: string
@@ -398,9 +369,11 @@ export class TrainerPanelService {
       this.readLegacyTrainerAttendanceRows(),
     ])
 
-    return this.formatSessionAttendanceDays(
+    const floor = await this.getTrainerFloorTiming()
+    return this.formatDailyAttendanceDays(
       storedDays,
-      liveRows.length > 0 ? liveRows : legacyRows
+      liveRows.length > 0 ? liveRows : legacyRows,
+      floor
     )
   }
 
@@ -415,19 +388,10 @@ export class TrainerPanelService {
       }
     }
 
-    const session = input.session ?? this.currentSessionKey()
-    if (!session) {
-      throw new BadRequestError(
-        "Attendance can be marked only during 5am-11am or 4pm-10pm"
-      )
-    }
+    const live = await this.markLiveDailyTrainerAttendance(input, requestId)
+    if (live) return live
 
-    return this.markStoredTrainerSessionAttendance(
-      session,
-      input.action,
-      input,
-      requestId
-    )
+    return this.markStoredDailyTrainerAttendance(input.action, input, requestId)
   }
 
   async getWorkouts() {
@@ -779,7 +743,24 @@ export class TrainerPanelService {
     )}.json`
   }
 
-  private async readStoredTrainerAttendanceDays(): Promise<StoredAttendanceDay[]> {
+  private async getTrainerFloorTiming(): Promise<TrainerFloorTiming> {
+    const { data, error } = await this.admin
+      .from("user_details")
+      .select("floor_start_time,floor_end_time")
+      .eq("user_id", this.ctx.authUserId)
+      .maybeSingle()
+
+    if (error && !isMissingDbObjectError(error)) throw error
+
+    return {
+      floorStartTime: (data as { floor_start_time?: string | null } | null)
+        ?.floor_start_time ?? null,
+      floorEndTime: (data as { floor_end_time?: string | null } | null)
+        ?.floor_end_time ?? null,
+    }
+  }
+
+  private async readStoredTrainerAttendanceDays(): Promise<StoredDailyAttendance[]> {
     await this.ensureTrainerDataBucket()
 
     const { data, error } = await this.admin.storage
@@ -810,40 +791,14 @@ export class TrainerPanelService {
           : []
 
       return rows
-        .map((row: unknown) => {
-          const record = asRecord(row)
-          const date = stringField(record, "date")
-          const rawSessions = asRecord(record?.sessions)
-          if (!date || !rawSessions) return null
-
-          const day: StoredAttendanceDay = { date, sessions: {} }
-          for (const key of SESSION_KEYS) {
-            const sessionRecord = asRecord(rawSessions[key])
-            const checkInAt = stringField(sessionRecord, "checkInAt")
-            if (!checkInAt) continue
-
-            day.sessions[key] = {
-              session: key,
-              status:
-                sessionRecord?.status === "late" ? "late" : "present",
-              checkInAt,
-              checkOutAt: stringField(sessionRecord, "checkOutAt"),
-              gpsVerified: sessionRecord?.gpsVerified === true,
-            }
-          }
-
-          return day
-        })
-        .filter(
-          (day: StoredAttendanceDay | null): day is StoredAttendanceDay =>
-            Boolean(day)
-        )
+        .map((row: unknown) => normalizeStoredDay(row))
+        .filter((day): day is StoredDailyAttendance => Boolean(day))
     } catch {
       return []
     }
   }
 
-  private async writeStoredTrainerAttendanceDays(days: StoredAttendanceDay[]) {
+  private async writeStoredTrainerAttendanceDays(days: StoredDailyAttendance[]) {
     await this.ensureTrainerDataBucket()
 
     const orderedDays = days
@@ -926,16 +881,6 @@ export class TrainerPanelService {
     return (minimal.data ?? []) as AttendanceRow[]
   }
 
-  private currentSessionKey(date = new Date()): SessionKey | null {
-    const { minutes } = zonedParts(date)
-    return (
-      SESSION_KEYS.find((key) => {
-        const session = ATTENDANCE_SESSIONS[key]
-        return minutes >= session.startMinutes && minutes <= session.endMinutes
-      }) ?? null
-    )
-  }
-
   private async verifyTrainerLocation(input: {
     latitude?: number
     longitude?: number
@@ -965,130 +910,127 @@ export class TrainerPanelService {
     return true
   }
 
-  private async markStoredTrainerSessionAttendance(
-    sessionKey: SessionKey,
-    action: SessionAction,
+  private rowToStoredDay(row: AttendanceRow, floor: TrainerFloorTiming): StoredDailyAttendance | null {
+    if (!row.date || !row.check_in_time) return null
+    const isLate =
+      row.status === "late" ||
+      isCheckInLate(row.check_in_time, floor.floorStartTime)
+
+    return {
+      date: row.date,
+      checkInAt: row.check_in_time,
+      checkOutAt: row.check_out_time ?? null,
+      status:
+        row.status === "half-day"
+          ? "half-day"
+          : isLate
+            ? "late"
+            : "present",
+      isLate,
+      gpsVerified:
+        row.distance_meters !== null && row.distance_meters !== undefined,
+    }
+  }
+
+  private async markStoredDailyTrainerAttendance(
+    action: DailyAttendanceAction,
     input: TrainerAttendanceCheckInInput,
     requestId: string
   ) {
     const now = new Date()
-    const { dateKey, minutes } = zonedParts(now)
-    const session = ATTENDANCE_SESSIONS[sessionKey]
-
-    if (minutes < session.startMinutes || minutes > session.endMinutes) {
-      throw new BadRequestError(
-        `${session.label} is open ${session.windowLabel}`
-      )
-    }
-
+    const { dateKey } = zonedParts(now)
+    const floor = await this.getTrainerFloorTiming()
     const days = await this.readStoredTrainerAttendanceDays()
     let day = days.find((entry) => entry.date === dateKey)
-    if (!day) {
-      day = { date: dateKey, sessions: {} }
-      days.push(day)
-    }
 
-    const existing = day.sessions[sessionKey]
     const gpsVerified = await this.verifyTrainerLocation(input)
 
     if (action === "check_in") {
-      if (existing?.checkInAt) {
-        throw new ConflictError("You already checked in for this session")
+      if (day?.checkInAt) {
+        throw new ConflictError("You already checked in today")
       }
 
-      day.sessions[sessionKey] = {
-        session: sessionKey,
-        status: minutes > session.lateAfterMinutes ? "late" : "present",
+      if (!resolveCheckInWindow(now)) {
+        throw new BadRequestError(
+          "Check-in is available only during 6:00–10:00 AM and 4:00–10:00 PM"
+        )
+      }
+
+      const isLate = isCheckInLate(now.toISOString(), floor.floorStartTime)
+      day = {
+        date: dateKey,
         checkInAt: now.toISOString(),
         checkOutAt: null,
+        status: isLate ? "late" : "present",
+        isLate,
         gpsVerified,
       }
+
+      const existingIndex = days.findIndex((entry) => entry.date === dateKey)
+      if (existingIndex >= 0) days[existingIndex] = day
+      else days.push(day)
     } else {
-      if (!existing?.checkInAt) {
+      if (!day?.checkInAt) {
         throw new BadRequestError("Check in before checking out")
       }
-      if (existing.checkOutAt) {
-        throw new ConflictError("You already checked out for this session")
+      if (day.checkOutAt) {
+        throw new ConflictError("You already checked out today")
       }
 
-      day.sessions[sessionKey] = {
-        ...existing,
-        checkOutAt: now.toISOString(),
-        gpsVerified: existing.gpsVerified || gpsVerified,
+      const checkOutAt = now.toISOString()
+      const status = deriveCheckoutStatus(
+        day.checkInAt,
+        checkOutAt,
+        floor,
+        day.isLate
+      )
+
+      day = {
+        ...day,
+        checkOutAt,
+        status,
+        isLate: status === "late" || day.isLate,
+        gpsVerified: day.gpsVerified || gpsVerified,
       }
+
+      const existingIndex = days.findIndex((entry) => entry.date === dateKey)
+      if (existingIndex >= 0) days[existingIndex] = day
     }
 
     await this.writeStoredTrainerAttendanceDays(days)
 
-    const updated = day.sessions[sessionKey]
     return {
-      id: `${this.ctx.authUserId}-${dateKey}-${sessionKey}`,
+      id: `${this.ctx.authUserId}-${dateKey}`,
       attendanceDate: dateKey,
-      session: sessionKey,
-      sessionLabel: session.label,
-      checkedInAt: updated?.checkInAt ?? null,
-      checkedOutAt: updated?.checkOutAt ?? null,
-      status: updated?.status ?? "present",
-      gpsVerified: updated?.gpsVerified ?? false,
+      checkedInAt: day.checkInAt,
+      checkedOutAt: day.checkOutAt,
+      status: day.status,
+      isLate: day.isLate,
+      workDuration: formatWorkDuration(day.checkInAt, day.checkOutAt),
+      gpsVerified: day.gpsVerified,
       action,
       requestId,
     }
   }
 
-  private sessionView(key: SessionKey, record?: StoredSessionRecord | null) {
-    const session = ATTENDANCE_SESSIONS[key]
-    return {
-      key,
-      label: session.label,
-      windowLabel: session.windowLabel,
-      lateAfterLabel: timeLabelFromMinutes(session.lateAfterMinutes),
-      status: record?.status ?? "not_marked",
-      checkInTime: record?.checkInAt ?? null,
-      checkOutTime: record?.checkOutAt ?? null,
-      gpsVerified: record?.gpsVerified ?? false,
-    }
-  }
-
-  private formatSessionAttendanceDays(
-    storedDays: StoredAttendanceDay[],
-    fallbackRows: AttendanceRow[] = []
+  private formatDailyAttendanceDays(
+    storedDays: StoredDailyAttendance[],
+    fallbackRows: AttendanceRow[] = [],
+    floor: TrainerFloorTiming
   ) {
     const monthStart = currentMonthStartKey()
     const monthEnd = currentMonthEndKey()
-    const todayParts = zonedParts()
-    const today = todayParts.dateKey
-    const dayMap = new Map<string, StoredAttendanceDay>()
+    const today = todayKey()
+    const dayMap = new Map<string, StoredDailyAttendance>()
 
     for (const storedDay of storedDays) {
-      dayMap.set(storedDay.date, {
-        date: storedDay.date,
-        sessions: { ...storedDay.sessions },
-      })
+      dayMap.set(storedDay.date, storedDay)
     }
 
     for (const row of fallbackRows) {
-      if (!row.date) continue
-      const day =
-        dayMap.get(row.date) ?? ({ date: row.date, sessions: {} } as StoredAttendanceDay)
-      if (!day.sessions.morning) {
-        day.sessions.morning = {
-          session: "morning",
-          status: row.status === "late" ? "late" : "present",
-          checkInAt: row.check_in_time ?? `${row.date}T00:00:00.000Z`,
-          checkOutAt: row.check_out_time ?? null,
-          gpsVerified:
-            row.distance_meters !== null && row.distance_meters !== undefined,
-        }
-      }
-      dayMap.set(row.date, day)
-    }
-
-    const elapsedSessionsForDate = (date: string) => {
-      if (date > today) return 0
-      if (date < today) return SESSION_KEYS.length
-      return SESSION_KEYS.filter(
-        (key) => todayParts.minutes >= ATTENDANCE_SESSIONS[key].startMinutes
-      ).length
+      const normalized = this.rowToStoredDay(row, floor)
+      if (!normalized || dayMap.has(normalized.date)) continue
+      dayMap.set(normalized.date, normalized)
     }
 
     const monthCursor = parseDateKey(monthStart)
@@ -1096,43 +1038,40 @@ export class TrainerPanelService {
     const days: Array<{
       date: string
       day: number
-      status: AttendanceStatus
+      status: DailyAttendanceStatus
       checkInTime: string | null
       checkOutTime: string | null
+      workDuration: string | null
+      isLate: boolean
       gpsVerified: boolean
-      sessions: ReturnType<TrainerPanelService["sessionView"]>[]
     }> = []
 
     while (monthCursor <= monthEndDate) {
       const date = toDateKey(monthCursor)
-      const day = dayMap.get(date)
-      const sessions = SESSION_KEYS.map((key) =>
-        this.sessionView(key, day?.sessions[key])
-      )
-      const markedSessions = sessions.filter((item) => item.checkInTime)
-      const elapsedSessions = elapsedSessionsForDate(date)
-      const status: AttendanceStatus =
-        markedSessions.length > 0
-          ? markedSessions.some((item) => item.status === "late")
-            ? "late"
-            : "present"
-          : elapsedSessions === 0
-            ? "not_marked"
-            : "absent"
+      const record = dayMap.get(date)
+      const future = date > today
+      const status: DailyAttendanceStatus = future
+        ? "not_marked"
+        : record
+          ? record.status === "half-day"
+            ? "half-day"
+            : record.isLate || record.status === "late"
+              ? "late"
+              : "present"
+          : "absent"
 
       days.push({
         date,
         day: monthCursor.getDate(),
         status,
-        checkInTime: markedSessions[0]?.checkInTime ?? null,
-        checkOutTime:
-          markedSessions
-            .map((item) => item.checkOutTime)
-            .filter((value): value is string => Boolean(value))
-            .sort()
-            .at(-1) ?? null,
-        gpsVerified: markedSessions.some((item) => item.gpsVerified),
-        sessions,
+        checkInTime: record?.checkInAt ?? null,
+        checkOutTime: record?.checkOutAt ?? null,
+        workDuration: formatWorkDuration(
+          record?.checkInAt ?? null,
+          record?.checkOutAt ?? null
+        ),
+        isLate: record?.isLate ?? false,
+        gpsVerified: record?.gpsVerified ?? false,
       })
 
       monthCursor.setDate(monthCursor.getDate() + 1)
@@ -1140,64 +1079,51 @@ export class TrainerPanelService {
 
     const countedDays = days.filter((day) => day.date <= today)
     const presentDays = countedDays.filter(
-      (day) => day.status === "present" || day.status === "late"
+      (day) =>
+        day.status === "present" ||
+        day.status === "late" ||
+        day.status === "half-day"
     ).length
     const absentDays = countedDays.filter((day) => day.status === "absent").length
-    const lateCheckIns = countedDays.reduce(
-      (sum, day) =>
-        sum + day.sessions.filter((session) => session.status === "late").length,
-      0
-    )
-    const elapsedSessionCount = countedDays.reduce(
-      (sum, day) => sum + elapsedSessionsForDate(day.date),
-      0
-    )
-    const completedSessionCount = countedDays.reduce(
-      (sum, day) =>
-        sum + day.sessions.filter((session) => Boolean(session.checkInTime)).length,
-      0
-    )
+    const lateCheckIns = countedDays.filter((day) => day.isLate).length
     const attendancePercent =
-      elapsedSessionCount > 0
-        ? Math.round((completedSessionCount / elapsedSessionCount) * 100)
+      countedDays.length > 0
+        ? Math.round((presentDays / countedDays.length) * 100)
         : 0
 
     let streak = 0
     const streakCursor = parseDateKey(today)
-
     while (streakCursor >= parseDateKey(monthStart)) {
       const date = toDateKey(streakCursor)
-      const day = dayMap.get(date)
-      const hasAttendance = SESSION_KEYS.some(
-        (key) => Boolean(day?.sessions[key]?.checkInAt)
-      )
-      if (!hasAttendance) break
+      if (!dayMap.get(date)?.checkInAt) break
       streak += 1
       streakCursor.setDate(streakCursor.getDate() - 1)
     }
 
     const todayDay = days.find((day) => day.date === today)
-    const currentSessionKey = this.currentSessionKey()
-    const currentSession =
-      currentSessionKey && todayDay
-        ? todayDay.sessions.find((session) => session.key === currentSessionKey) ??
-          null
-        : null
+    const todayRecord = dayMap.get(today)
 
     return {
-      month: {
-        start: monthStart,
-        end: monthEnd,
+      month: { start: monthStart, end: monthEnd },
+      floorTiming: {
+        start: floor.floorStartTime,
+        end: floor.floorEndTime,
+        startLabel: formatFloorTimeLabel(floor.floorStartTime),
+        endLabel: formatFloorTimeLabel(floor.floorEndTime),
       },
+      operatingWindows: operatingWindowsForDisplay(),
       today: {
-        checkedIn:
-          todayDay?.sessions.some((session) => Boolean(session.checkInTime)) ??
-          false,
+        checkedIn: Boolean(todayRecord?.checkInAt),
+        checkedOut: Boolean(todayRecord?.checkOutAt),
         status: todayDay?.status ?? "not_marked",
-        checkInTime: todayDay?.checkInTime ?? null,
-        checkOutTime: todayDay?.checkOutTime ?? null,
-        sessions: todayDay?.sessions ?? SESSION_KEYS.map((key) => this.sessionView(key)),
-        currentSession,
+        checkInTime: todayRecord?.checkInAt ?? null,
+        checkOutTime: todayRecord?.checkOutAt ?? null,
+        workDuration: formatWorkDuration(
+          todayRecord?.checkInAt ?? null,
+          todayRecord?.checkOutAt ?? null
+        ),
+        isLate: todayRecord?.isLate ?? false,
+        gpsVerified: todayRecord?.gpsVerified ?? false,
       },
       summary: {
         presentDays,
@@ -1205,31 +1131,20 @@ export class TrainerPanelService {
         attendancePercent,
         streak,
         lateCheckIns,
-        completedSessions: completedSessionCount,
-        totalSessions: elapsedSessionCount,
       },
       calendar: days,
       history: Array.from(dayMap.values())
-        .flatMap((day) =>
-          SESSION_KEYS.flatMap((key) => {
-            const record = day.sessions[key]
-            if (!record) return []
-            const session = ATTENDANCE_SESSIONS[key]
-            return [
-              {
-                id: `${this.ctx.authUserId}-${day.date}-${key}`,
-                date: day.date,
-                session: key,
-                sessionLabel: session.label,
-                windowLabel: session.windowLabel,
-                checkInTime: record.checkInAt,
-                checkOutTime: record.checkOutAt,
-                status: record.status,
-                gpsVerified: record.gpsVerified,
-              },
-            ]
-          })
-        )
+        .filter((day) => day.checkInAt)
+        .map((day) => ({
+          id: `${this.ctx.authUserId}-${day.date}`,
+          date: day.date,
+          checkInTime: day.checkInAt,
+          checkOutTime: day.checkOutAt,
+          status: day.status,
+          isLate: day.isLate,
+          workDuration: formatWorkDuration(day.checkInAt, day.checkOutAt),
+          gpsVerified: day.gpsVerified,
+        }))
         .sort((first, second) =>
           (second.checkInTime ?? second.date).localeCompare(
             first.checkInTime ?? first.date
@@ -1299,7 +1214,7 @@ export class TrainerPanelService {
     const days: Array<{
       date: string
       day: number
-      status: AttendanceStatus
+      status: DailyAttendanceStatus
       checkInTime: string | null
       gpsVerified: boolean
     }> = []
@@ -1315,9 +1230,11 @@ export class TrainerPanelService {
         status: future
           ? "not_marked"
           : record
-            ? record.status === "late"
-              ? "late"
-              : "present"
+            ? record.status === "half-day"
+              ? "half-day"
+              : record.status === "late"
+                ? "late"
+                : "present"
             : "absent",
         checkInTime: record?.check_in_time ?? null,
         gpsVerified:
@@ -1381,25 +1298,24 @@ export class TrainerPanelService {
     }
   }
 
-  private async markLiveTrainerAttendance(
-    input: { latitude?: number; longitude?: number },
+  private async markLiveDailyTrainerAttendance(
+    input: TrainerAttendanceCheckInInput,
     requestId: string
   ) {
     const gym = await this.getAttendanceGym()
     if (!gym) return null
 
+    const date = todayKey()
+    const floor = await this.getTrainerFloorTiming()
     const existing = await this.admin
       .from("attendance")
-      .select("id,date,check_in_time,status,distance_meters")
+      .select("id,date,check_in_time,check_out_time,status,distance_meters")
       .eq("user_id", this.ctx.authUserId)
-      .eq("date", todayKey())
+      .eq("date", date)
       .maybeSingle()
 
     if (existing.error && !isMissingDbObjectError(existing.error)) {
       throw existing.error
-    }
-    if (existing.data) {
-      throw new ConflictError("You already checked in today")
     }
 
     let distance: number | null = null
@@ -1420,35 +1336,105 @@ export class TrainerPanelService {
       }
     }
 
-    const insertResult = await this.admin
-      .from("attendance")
-      .insert({
-        user_id: this.ctx.authUserId,
-        gym_id: gym.id,
-        date: todayKey(),
-        status: "present",
-        check_in_time: new Date().toISOString(),
-        latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
-        distance_meters: distance === null ? null : Number(distance.toFixed(2)),
-      })
-      .select("id,date,check_in_time,status,distance_meters")
-      .single()
+    const gpsVerified = distance !== null
+    const nowIso = new Date().toISOString()
 
-    if (insertResult.error) {
-      if (isDuplicateError(insertResult.error)) {
+    if (input.action === "check_in") {
+      if (existing.data?.check_in_time) {
         throw new ConflictError("You already checked in today")
       }
-      if (isMissingDbObjectError(insertResult.error)) return null
-      throw insertResult.error
+
+      if (!resolveCheckInWindow(new Date())) {
+        throw new BadRequestError(
+          "Check-in is available only during 6:00–10:00 AM and 4:00–10:00 PM"
+        )
+      }
+
+      const isLate = isCheckInLate(nowIso, floor.floorStartTime)
+      const insertResult = await this.admin
+        .from("attendance")
+        .insert({
+          user_id: this.ctx.authUserId,
+          gym_id: gym.id,
+          date,
+          status: isLate ? "late" : "present",
+          check_in_time: nowIso,
+          latitude: input.latitude ?? null,
+          longitude: input.longitude ?? null,
+          distance_meters:
+            distance === null ? null : Number(distance.toFixed(2)),
+        })
+        .select("id,date,check_in_time,check_out_time,status,distance_meters")
+        .single()
+
+      if (insertResult.error) {
+        if (isDuplicateError(insertResult.error)) {
+          throw new ConflictError("You already checked in today")
+        }
+        if (isMissingDbObjectError(insertResult.error)) return null
+        throw insertResult.error
+      }
+
+      return {
+        id: insertResult.data.id,
+        attendanceDate: insertResult.data.date,
+        checkedInAt: insertResult.data.check_in_time,
+        checkedOutAt: insertResult.data.check_out_time ?? null,
+        status: insertResult.data.status,
+        isLate,
+        workDuration: null,
+        gpsVerified: insertResult.data.distance_meters !== null,
+        action: input.action,
+        requestId,
+      }
+    }
+
+    if (!existing.data?.check_in_time) {
+      throw new BadRequestError("Check in before checking out")
+    }
+    if (existing.data.check_out_time) {
+      throw new ConflictError("You already checked out today")
+    }
+
+    const wasLate =
+      existing.data.status === "late" ||
+      isCheckInLate(existing.data.check_in_time, floor.floorStartTime)
+    const status = deriveCheckoutStatus(
+      existing.data.check_in_time,
+      nowIso,
+      floor,
+      wasLate
+    )
+
+    const updateResult = await this.admin
+      .from("attendance")
+      .update({
+        check_out_time: nowIso,
+        status,
+      })
+      .eq("id", existing.data.id)
+      .select("id,date,check_in_time,check_out_time,status,distance_meters")
+      .single()
+
+    if (updateResult.error) {
+      if (isMissingDbObjectError(updateResult.error)) return null
+      throw updateResult.error
     }
 
     return {
-      id: insertResult.data.id,
-      attendanceDate: insertResult.data.date,
-      checkedInAt: insertResult.data.check_in_time,
-      status: insertResult.data.status,
-      gpsVerified: insertResult.data.distance_meters !== null,
+      id: updateResult.data.id,
+      attendanceDate: updateResult.data.date,
+      checkedInAt: updateResult.data.check_in_time,
+      checkedOutAt: updateResult.data.check_out_time,
+      status: updateResult.data.status,
+      isLate: status === "late" || wasLate,
+      workDuration: formatWorkDuration(
+        updateResult.data.check_in_time,
+        updateResult.data.check_out_time
+      ),
+      gpsVerified:
+        updateResult.data.distance_meters !== null || gpsVerified,
+      action: input.action,
       requestId,
     }
   }
