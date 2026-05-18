@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react"
 import {
+  AlertCircle,
   CalendarDays,
   CheckCircle2,
+  Clock,
+  Info,
   IndianRupee,
   Loader2,
   Mail,
@@ -11,6 +14,8 @@ import {
   Shield,
   Users,
   X,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState, PageIntro, SearchToolbar, StatusPill, SurfaceCard } from "@/components/powerhouse"
@@ -25,11 +30,29 @@ interface OwnerTrainer {
   salaryStatus: "paid" | "processing" | "pending"; currentSalary: number
 }
 
+interface CalendarDay {
+  date: string
+  status: "present" | "late" | "absent" | "half-day"
+  checkInTime: string | null
+  checkOutTime: string | null
+  workDuration: string | null
+  isLate: boolean
+}
+
 interface TrainerDetail {
   id: string; name: string; email: string | null; phone: string | null
   avatarUrl: string | null; specialization: string | null; experience: string | null
   govtIdUrl: string | null; govtIdType: string | null; joinDate: string
-  attendance: { presentDays: number; workingDays: number; attendanceRate: number; lateDays: number; checkedInToday: boolean; calendar: Array<{ date: string; present: boolean }> }
+  floorTiming: { startTime: string | null; endTime: string | null; startLabel: string | null; endLabel: string | null }
+  attendance: {
+    presentDays: number; absentDays: number; lateDays: number; halfDays: number
+    workingDays: number; attendanceRate: number; checkedInToday: boolean
+    consecutiveAbsences: number; totalHoursWorked: string | null
+    avgCheckIn: string | null; avgCheckOut: string | null
+    calendar: CalendarDay[]
+    payrollSuggestion: { baseSalary: number; workingDays: number; absentDays: number; perDayRate: number; suggestedDeduction: number; finalSalary: number }
+    insights: string[]
+  }
   clients: Array<{ id: string; name: string; planStatus: string }>
   salaryHistory: Array<{ id: string; monthStart: string; baseSalary: number; bonus: number; total: number; status: string; paidAt: string | null }>
 }
@@ -42,14 +65,85 @@ function formatCurrency(v: number) { return new Intl.NumberFormat("en-IN", { sty
 function salaryTone(s: string) { return s === "paid" ? "success" : s === "processing" ? "warning" : "error" }
 function planTone(s: string) { return s === "active" ? "success" : s === "pending" ? "warning" : "neutral" }
 
-/* ── Attendance Calendar ────────────────────────────────────────────────── */
-function AttendanceCalendar({ calendar }: { calendar: Array<{ date: string; present: boolean }> }) {
+/* ── Rich Attendance Calendar ───────────────────────────────────────────── */
+function RichCalendar({ calendar }: { calendar: CalendarDay[] }) {
+  const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(calendar[calendar.length - 1] ?? null)
+
+  const getColor = (status: string) => {
+    switch (status) {
+      case "present": return "bg-emerald-500 hover:bg-emerald-400 border-emerald-600"
+      case "late": return "bg-amber-500 hover:bg-amber-400 border-amber-600"
+      case "half-day": return "bg-blue-500 hover:bg-blue-400 border-blue-600"
+      case "absent": return "bg-red-500/20 hover:bg-red-500/40 border-red-500/30"
+      default: return "bg-muted"
+    }
+  }
+
   return (
-    <div className="flex flex-wrap gap-1">
-      {calendar.map(day => (
-        <div key={day.date} title={day.date}
-          className={`h-5 w-5 rounded-sm ${day.present ? "bg-emerald-500" : "bg-muted"}`} />
-      ))}
+    <div className="space-y-4">
+      {/* Calendar Grid */}
+      <div className="flex flex-wrap gap-1.5">
+        {calendar.map(day => {
+          const isSelected = selectedDay?.date === day.date
+          return (
+            <button
+              key={day.date}
+              onClick={() => setSelectedDay(day)}
+              className={`h-7 w-7 rounded-md border text-[10px] font-bold text-white transition-all ${getColor(day.status)} ${isSelected ? "ring-2 ring-primary ring-offset-1 ring-offset-card" : ""}`}
+            >
+              {parseInt(day.date.split("-")[2]!)}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-sm bg-emerald-500" /> Present</div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-sm bg-amber-500" /> Late</div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-sm bg-blue-500" /> Half Day</div>
+        <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-sm bg-red-500/30" /> Absent</div>
+      </div>
+
+      {/* Selected Day Details */}
+      {selectedDay && (
+        <div className="mt-4 rounded-xl border border-border bg-background p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <p className="font-bold text-foreground">{formatDate(selectedDay.date)}</p>
+            <StatusPill 
+              status={selectedDay.status === "present" ? "success" : selectedDay.status === "late" ? "warning" : selectedDay.status === "half-day" ? "neutral" : "error"} 
+              label={selectedDay.status} 
+              size="sm" 
+            />
+          </div>
+          
+          {selectedDay.status !== "absent" ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Check In</p>
+                <p className={`mt-0.5 font-bold ${selectedDay.isLate ? "text-amber-500" : "text-foreground"}`}>
+                  {selectedDay.checkInTime ?? "—"}
+                  {selectedDay.isLate && <span className="ml-1 text-[10px]">(Late)</span>}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Check Out</p>
+                <p className="mt-0.5 font-bold text-foreground">{selectedDay.checkOutTime ?? "—"}</p>
+              </div>
+              {selectedDay.workDuration && (
+                <div className="col-span-2 rounded-lg bg-secondary/50 p-2 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Duration</p>
+                  <p className="font-bold text-foreground">{selectedDay.workDuration}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+              Trainer was absent on this day.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -70,15 +164,15 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 flex h-full w-full max-w-md flex-col overflow-hidden border-l border-border bg-background shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="text-base font-bold text-foreground">Trainer Profile</h2>
+      <div className="relative z-10 flex h-full w-full max-w-[500px] flex-col overflow-hidden border-l border-border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border bg-card px-5 py-4">
+          <h2 className="text-base font-bold text-foreground">Operational Profile</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {loading ? (
             <div className="flex h-48 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
           ) : !detail ? (
@@ -90,38 +184,83 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                 <Avatar className="h-16 w-16 shrink-0">
                   <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">{initials(detail.name)}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">{detail.name}</h3>
-                  {detail.specialization && <p className="text-sm text-primary">{detail.specialization}</p>}
-                  {detail.experience && <p className="text-xs text-muted-foreground">{detail.experience} experience</p>}
-                  {detail.email && <p className="text-xs text-muted-foreground mt-0.5">{detail.email}</p>}
-                  <p className="mt-1 text-xs text-muted-foreground">Joined {formatDate(detail.joinDate)}</p>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-xl font-black text-foreground">{detail.name}</h3>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {detail.specialization && <span className="font-semibold text-primary">{detail.specialization}</span>}
+                    {detail.experience && <span>· {detail.experience} exp</span>}
+                  </div>
+                  {detail.floorTiming.startLabel && (
+                    <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1 text-[10px] font-bold text-foreground">
+                      <Clock className="h-3 w-3 text-muted-foreground" />
+                      Expected: {detail.floorTiming.startLabel} - {detail.floorTiming.endLabel}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Attendance This Month */}
-              <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">This Month's Attendance</p>
-                <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: "Present", value: detail.attendance.presentDays },
-                      { label: "Of working", value: detail.attendance.workingDays },
-                      { label: "Rate", value: `${detail.attendance.attendanceRate}%` },
-                    ].map(stat => (
-                      <div key={stat.label} className="rounded-lg bg-background p-2 text-center">
-                        <p className="text-lg font-bold text-foreground">{stat.value}</p>
-                        <p className="text-[10px] text-muted-foreground">{stat.label}</p>
-                      </div>
+              {/* Smart Insights */}
+              {detail.attendance.insights.length > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-amber-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <p className="text-xs font-bold uppercase tracking-widest">Operational Alerts</p>
+                  </div>
+                  <ul className="space-y-1.5 pl-6 text-sm text-foreground list-disc marker:text-amber-500">
+                    {detail.attendance.insights.map((insight, i) => (
+                      <li key={i}>{insight}</li>
                     ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Attendance Analytics Matrix */}
+              <div>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Performance Metrics</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border border-border bg-card p-3 text-center">
+                    <p className="text-2xl font-black text-emerald-500">{detail.attendance.attendanceRate}%</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rate</p>
                   </div>
-                  <div>
-                    <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Calendar</p>
-                    <AttendanceCalendar calendar={detail.attendance.calendar} />
+                  <div className="rounded-xl border border-border bg-card p-3 text-center">
+                    <p className="text-2xl font-black text-foreground">{detail.attendance.presentDays}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Present</p>
                   </div>
-                  {detail.attendance.lateDays > 0 && (
-                    <p className="text-xs text-amber-500">{detail.attendance.lateDays} late check-in{detail.attendance.lateDays !== 1 ? "s" : ""} this month</p>
-                  )}
+                  <div className={`rounded-xl border border-border bg-card p-3 text-center ${detail.attendance.absentDays > 0 ? "border-red-500/30 bg-red-500/5" : ""}`}>
+                    <p className={`text-2xl font-black ${detail.attendance.absentDays > 0 ? "text-red-500" : "text-foreground"}`}>{detail.attendance.absentDays}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Absent</p>
+                  </div>
+                  <div className={`rounded-xl border border-border bg-card p-3 text-center ${detail.attendance.lateDays > 0 ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
+                    <p className={`text-2xl font-black ${detail.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground"}`}>{detail.attendance.lateDays}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Late</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Avg In Time</p>
+                      <p className="font-bold text-foreground">{detail.attendance.avgCheckIn ?? "—"}</p>
+                    </div>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Total Hours</p>
+                      <p className="font-bold text-foreground">{detail.attendance.totalHoursWorked ?? "—"}</p>
+                    </div>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance Log */}
+              <div className="rounded-xl border border-border bg-card p-1">
+                <div className="px-4 py-3 pb-2 border-b border-border">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Daily Log</p>
+                </div>
+                <div className="p-4">
+                  <RichCalendar calendar={detail.attendance.calendar} />
                 </div>
               </div>
 
@@ -132,7 +271,7 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                   <div className="space-y-1.5">
                     {detail.clients.map(c => (
                       <div key={c.id} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                        <p className="text-sm font-medium text-foreground">{c.name}</p>
+                         <p className="text-sm font-medium text-foreground">{c.name}</p>
                         <StatusPill status={planTone(c.planStatus)} label={c.planStatus} size="sm" />
                       </div>
                     ))}
@@ -157,26 +296,6 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                 </div>
               )}
 
-              {/* Salary History */}
-              {detail.salaryHistory.length > 0 && (
-                <div>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Salary History</p>
-                  <div className="space-y-2">
-                    {detail.salaryHistory.map(s => (
-                      <div key={s.id} className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{formatMonth(s.monthStart)}</p>
-                          <p className="text-xs text-muted-foreground">Base {formatCurrency(s.baseSalary)} + {formatCurrency(s.bonus)} bonus</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-foreground">{formatCurrency(s.total)}</p>
-                          <StatusPill status={salaryTone(s.status)} label={s.status} size="sm" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>
