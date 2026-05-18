@@ -167,8 +167,11 @@ export default function OwnerRequestsPage() {
       }
 
       if (confirmAction === "approve" && result.data?.tempPassword) {
+        const isUserDefined = result.data.tempPassword === "[User Defined]"
         toast.success("Request approved — account created", {
-          description: `Share this temporary password with ${selectedRequest.name}: ${result.data.tempPassword}`,
+          description: isUserDefined
+            ? `${selectedRequest.name} can now sign in using the password they set during signup.`
+            : `Share this temporary password with ${selectedRequest.name}: ${result.data.tempPassword}`,
           duration: 20000,
         })
       } else {

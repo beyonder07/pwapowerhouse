@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, CheckCircle, Upload, X, ShieldCheck, FileText, CreditCard } from "lucide-react"
+import { Loader2, CheckCircle, Upload, X, ShieldCheck, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import { createClient } from "@supabase/supabase-js"
 
@@ -33,11 +33,13 @@ export default function ClientSignupPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [govtIdUrl, setGovtIdUrl] = useState("")
   const [isUploadingGovtId, setIsUploadingGovtId] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
+    password: "",
     branch: "",
     govtIdType: "",
     govtIdNumber: "",
@@ -94,8 +96,21 @@ export default function ClientSignupPage() {
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     if (!formData.fullName.trim()) newErrors.fullName = "Full name required"
-    if (!formData.email) newErrors.email = "Email required"
-    if (!formData.phone) newErrors.phone = "Phone number required"
+    if (!formData.email) {
+      newErrors.email = "Email required"
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email"
+    }
+    if (!formData.phone) {
+      newErrors.phone = "Phone number required"
+    } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ""))) {
+      newErrors.phone = "Please enter a valid 10-digit phone number"
+    }
+    if (!formData.password) {
+      newErrors.password = "Password required"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
     if (!formData.branch) newErrors.branch = "Branch required"
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -118,6 +133,7 @@ export default function ClientSignupPage() {
           email: formData.email,
           phone: formData.phone,
           branchId: formData.branch,
+          password: formData.password,
           govtIdUrl: govtIdUrl || null,
           govtIdType: formData.govtIdType || null,
           govtIdNumber: formData.govtIdNumber || null,
@@ -140,7 +156,7 @@ export default function ClientSignupPage() {
           <div className="flex justify-center">
             <CheckCircle className="h-16 w-16 text-emerald-500" />
           </div>
-          <p className="text-foreground">Your request is being reviewed. We will contact you at <b>{formData.phone}</b> soon.</p>
+          <p className="text-foreground">Your request is being reviewed. We will create your account and you can log in as soon as the owner approves.</p>
           <Button asChild className="w-full"><Link href="/">Home</Link></Button>
         </div>
       </AuthLayout>
@@ -148,7 +164,7 @@ export default function ClientSignupPage() {
   }
 
   return (
-    <AuthLayout title="Request Membership" subtitle="Submit your details — we will create your account after approval">
+    <AuthLayout title="Request Membership" subtitle="Submit your details — you can set your password now for immediate login upon approval">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-4">
           <div className="grid gap-2">
@@ -166,6 +182,35 @@ export default function ClientSignupPage() {
             <Input id="phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="10-digit number" />
             {errors.phone ? <p className="text-xs text-red-500">{errors.phone}</p> : null}
           </div>
+          
+          <div className="grid gap-2">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={formData.password}
+                onChange={e => setFormData({...formData, password: e.target.value})}
+                placeholder="Choose a strong password (min 6 chars)"
+                className="pr-10"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                )}
+              </Button>
+            </div>
+            {errors.password ? <p className="text-xs text-red-500">{errors.password}</p> : null}
+          </div>
+
           <div className="grid gap-2">
             <Label>Branch</Label>
             <Select value={formData.branch} onValueChange={v => setFormData({...formData, branch: v})}>

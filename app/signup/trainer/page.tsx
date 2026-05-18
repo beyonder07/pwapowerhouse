@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FileCheck, Loader2, CheckCircle, Upload, X } from "lucide-react"
+import { FileCheck, Loader2, CheckCircle, Upload, X, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 
 interface BranchOption {
@@ -42,11 +42,13 @@ export default function TrainerSignupPage() {
   const [profilePreview, setProfilePreview] = useState<string | null>(null)
   const [govtIdUrl, setGovtIdUrl] = useState("")
   const [isUploadingGovtId, setIsUploadingGovtId] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [branches, setBranches] = useState<BranchOption[]>([])
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     phone: "",
+    password: "",
     branch: "",
     specialization: "",
     experience: "",
@@ -185,6 +187,12 @@ export default function TrainerSignupPage() {
       newErrors.phone = "Please enter a valid 10-digit phone number"
     }
 
+    if (!formData.password) {
+      newErrors.password = "Please enter your password"
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters"
+    }
+
     if (!formData.branch) {
       newErrors.branch = "Please select your preferred branch"
     }
@@ -225,6 +233,7 @@ export default function TrainerSignupPage() {
           openToAnyBranch,
           specialization: formData.specialization,
           experience: formData.experience,
+          password: formData.password,
           govtIdUrl,
           about: formData.about,
         }),
@@ -269,9 +278,7 @@ export default function TrainerSignupPage() {
               Your trainer application has been received!
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Our team will review your application and contact you at{" "}
-              <span className="text-foreground break-all">{formData.phone}</span> within
-              3-5 business days for the next steps.
+              Our team will review your application. Once approved by the owner, you can log in immediately using the email and password you set.
             </p>
           </div>
           <div className="pt-2 sm:pt-4 space-y-2 sm:space-y-3">
@@ -415,6 +422,47 @@ export default function TrainerSignupPage() {
               </motion.p>
             )}
           </div>
+        </div>
+
+        {/* Password */}
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-xs sm:text-sm">Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Choose a strong password (min 6 chars)"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              disabled={isLoading}
+              className="bg-secondary border-border text-sm pr-10"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
+            >
+              {showPassword ? (
+                <EyeOff className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
+          {errors.password && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs text-destructive"
+            >
+              {errors.password}
+            </motion.p>
+          )}
         </div>
 
         {/* Specialization & Experience */}

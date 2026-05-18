@@ -1,6 +1,7 @@
 import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import { BadRequestError, ConflictError } from "@/src/utils/errors"
 import { randomBytes } from "crypto"
+import { decrypt } from "@/src/utils/crypto"
 
 interface RequestData {
   fullName?: string
@@ -15,6 +16,7 @@ interface RequestData {
   experience?: string | null
   openToAnyBranch?: boolean
   durationDays?: number
+  encryptedPassword?: string | null
 }
 
 function generateTempPassword() {
@@ -37,7 +39,17 @@ export class RequestProvisioningService {
 
     const role = ["client", "member"].includes(requestType) ? "client" : "trainer"
     const gymId = data.branchId ?? (await this.defaultGymId())
-    const tempPassword = generateTempPassword()
+    
+    let password = generateTempPassword()
+    let isUserDefined = false
+    if (data.encryptedPassword) {
+      try {
+        password = decrypt(data.encryptedPassword)
+        isUserDefined = true
+      } catch (err) {
+        console.error("Failed to decrypt user password, falling back to temp password:", err)
+      }
+    }
 
     const { data: existing } = await this.admin
       .from("users")
@@ -51,7 +63,7 @@ export class RequestProvisioningService {
 
     const { data: authData, error: createError } = await this.admin.auth.admin.createUser({
       email,
-      password: tempPassword,
+      password,
       email_confirm: true,
       app_metadata: { role },
       user_metadata: {
@@ -107,7 +119,7 @@ export class RequestProvisioningService {
       })
     }
 
-    return { userId, tempPassword }
+    return { userId, tempPassword: isUserDefined ? "[User Defined]" : password }
   }
 
   private async defaultGymId() {
@@ -115,3 +127,4 @@ export class RequestProvisioningService {
     return data?.id ?? null
   }
 }
+
