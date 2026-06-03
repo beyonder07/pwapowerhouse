@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   Calendar,
@@ -8,11 +8,15 @@ import {
   CheckCircle2,
   Clock,
   Dumbbell,
+  Edit2,
   IndianRupee,
   Loader2,
   Mail,
   Phone,
+  Save,
   SearchX,
+  ToggleLeft,
+  ToggleRight,
   Users,
   X,
 } from "lucide-react"
@@ -27,6 +31,7 @@ interface OwnerMember {
   avatarUrl: string | null; branch: string | null; joinDate: string
   membershipStatus: "active" | "expiring" | "expired"
   daysRemaining: number; lastCheckInRelative: string
+  isActive: boolean; daysSinceLastCheckIn: number | null
 }
 
 interface MemberDetail {
@@ -44,17 +49,104 @@ function formatCurrency(v: number) { return new Intl.NumberFormat("en-IN", { sty
 function membershipTone(s: OwnerMember["membershipStatus"]) { return s === "active" ? "success" : s === "expiring" ? "warning" : "error" }
 function paymentTone(s: string) { return s === "approved" ? "success" : s === "pending" ? "warning" : "error" }
 
-function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => void }) {
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date)
+  d.setMonth(d.getMonth() + months)
+  return d
+}
+
+function MemberDrawer({ memberId, memberIsActive, onClose, onStatusChange }: {
+  memberId: string
+  memberIsActive: boolean
+  onClose: () => void
+  onStatusChange: (id: string, isActive: boolean) => void
+}) {
   const [detail, setDetail] = useState<MemberDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showEdit, setShowEdit] = useState(false)
+  const [editStartDate, setEditStartDate] = useState("")
+  const [editDuration, setEditDuration] = useState("1")
+  const [editEndDate, setEditEndDate] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [toggling, setToggling] = useState(false)
+  const [isActive, setIsActive] = useState(memberIsActive)
 
-  useEffect(() => {
+  const loadDetail = useCallback(() => {
+    setLoading(true)
     fetch(`/api/owner/members/${memberId}`, { credentials: "include", cache: "no-store" })
       .then(r => r.json())
       .then(r => { if (r.success) setDetail(r.data); else toast.error("Failed to load member detail") })
       .catch(() => toast.error("Failed to load member detail"))
       .finally(() => setLoading(false))
   }, [memberId])
+
+  useEffect(() => { loadDetail() }, [loadDetail])
+
+  // Auto-compute end date when start date or duration changes
+  useEffect(() => {
+    if (editStartDate && editDuration && editDuration !== "custom") {
+      const months = parseInt(editDuration)
+      if (!isNaN(months)) {
+        const end = addMonths(new Date(editStartDate), months)
+        setEditEndDate(end.toISOString().split("T")[0])
+      }
+    }
+  }, [editStartDate, editDuration])
+
+  // Pre-fill from existing membership
+  useEffect(() => {
+    if (detail?.membership) {
+      setEditStartDate(detail.membership.startDate)
+      setEditEndDate(detail.membership.endDate)
+    }
+  }, [detail])
+
+  async function handleSaveMembership() {
+    if (!editStartDate || !editEndDate) {
+      toast.error("Please fill in both dates")
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/owner/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ startDate: editStartDate, endDate: editEndDate }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.error || "Save failed")
+      toast.success("Membership updated")
+      setShowEdit(false)
+      loadDetail()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleToggleActive() {
+    setToggling(true)
+    const next = !isActive
+    try {
+      const res = await fetch(`/api/owner/members/${memberId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ is_active: next }),
+      })
+      const result = await res.json()
+      if (!result.success) throw new Error(result.error || "Update failed")
+      setIsActive(next)
+      onStatusChange(memberId, next)
+      toast.success(next ? "Member activated" : "Member deactivated")
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setToggling(false)
+    }
+  }
 
   return (
     // Backdrop
@@ -103,9 +195,40 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                   </div>
                 </div>
 
+                {/* Active / Inactive toggle */}
+                <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Member Status</p>
+                    <p className="text-xs text-muted-foreground">{isActive ? "Active — can check in" : "Inactive — check-in blocked"}</p>
+                  </div>
+                  <button
+                    onClick={handleToggleActive}
+                    disabled={toggling}
+                    className="flex items-center gap-1.5 transition-opacity disabled:opacity-60"
+                    aria-label="Toggle active status"
+                  >
+                    {toggling
+                      ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      : isActive
+                        ? <ToggleRight className="h-8 w-8 text-emerald-500" />
+                        : <ToggleLeft className="h-8 w-8 text-muted-foreground" />
+                    }
+                  </button>
+                </div>
+
                 {/* Membership */}
-                <div className="mt-6">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Membership</p>
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Membership</p>
+                    <button
+                      onClick={() => setShowEdit(v => !v)}
+                      className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      {showEdit ? "Cancel" : "Edit"}
+                    </button>
+                  </div>
+
                   {detail.membership ? (
                     <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
                       <div className="flex justify-between items-center mb-2.5">
@@ -124,6 +247,60 @@ function MemberDrawer({ memberId, onClose }: { memberId: string; onClose: () => 
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border p-3 text-center">No membership on record</p>
+                  )}
+
+                  {/* Edit Form */}
+                  {showEdit && (
+                    <div className="mt-3 rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Edit Membership</p>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground">Start Date</label>
+                        <input
+                          type="date"
+                          value={editStartDate}
+                          onChange={e => { setEditStartDate(e.target.value); setEditDuration("custom") }}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground">Duration</label>
+                        <select
+                          value={editDuration}
+                          onChange={e => setEditDuration(e.target.value)}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        >
+                          <option value="1">1 Month</option>
+                          <option value="2">2 Months</option>
+                          <option value="3">3 Months</option>
+                          <option value="6">6 Months</option>
+                          <option value="12">12 Months (1 Year)</option>
+                          <option value="custom">Custom End Date</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-muted-foreground">
+                          End Date {editDuration !== "custom" && <span className="text-primary">(auto-computed)</span>}
+                        </label>
+                        <input
+                          type="date"
+                          value={editEndDate}
+                          onChange={e => { setEditEndDate(e.target.value); setEditDuration("custom") }}
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        />
+                      </div>
+
+                      <Button
+                        className="w-full gap-2"
+                        onClick={handleSaveMembership}
+                        disabled={saving}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Save Membership
+                      </Button>
+                    </div>
                   )}
                 </div>
 
@@ -240,6 +417,11 @@ export default function OwnerMembersPage() {
   const totalPages = Math.max(1, Math.ceil(total / itemsPerPage))
   const hasFilters = search.trim() || status !== "all"
 
+  // Optimistically update is_active in local list so the card dims without refetch
+  const handleStatusChange = useCallback((id: string, isActive: boolean) => {
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, isActive } : m))
+  }, [])
+
   return (
     <div className="max-w-6xl">
       <PageIntro title="Members" description="All gym members — tap any card to see full profile" />
@@ -247,7 +429,13 @@ export default function OwnerMembersPage() {
       <SurfaceCard className="mb-6">
         <SearchToolbar value={search} onChange={(v) => { setSearch(v); setCurrentPage(1) }} placeholder="Search by name…"
           filters={[{ value: status, onChange: (v) => { setStatus(v); setCurrentPage(1) }, placeholder: "All Status",
-            options: [{ value: "all", label: "All" }, { value: "active", label: "Active" }, { value: "expiring", label: "Expiring" }, { value: "expired", label: "Expired" }] }]} />
+            options: [
+              { value: "all", label: "All" },
+              { value: "active", label: "Active" },
+              { value: "expiring", label: "Expiring" },
+              { value: "expired", label: "Expired" },
+              { value: "inactive", label: "🔴 Inactive" },
+            ] }]} />
       </SurfaceCard>
 
       {!isLoading && <p className="mb-3 text-xs text-muted-foreground">Showing {members.length} of {total} member{total !== 1 ? "s" : ""}</p>}
@@ -260,7 +448,7 @@ export default function OwnerMembersPage() {
               description={hasFilters ? "Try adjusting filters." : "Members appear here once signed up."} />
           : members.map(m => (
             <button key={m.id} onClick={() => setSelectedId(m.id)} className="w-full text-left">
-              <SurfaceCard interactive className="hover:border-primary/40">
+              <SurfaceCard interactive className={`hover:border-primary/40 transition-opacity ${!m.isActive ? "opacity-50 grayscale" : ""}`}>
                 {/* Mobile: stack vertically. Desktop: single row */}
                 <div className="flex items-center gap-3 overflow-hidden">
                   <Avatar className="h-10 w-10 shrink-0">
@@ -268,10 +456,13 @@ export default function OwnerMembersPage() {
                     <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">{initials(m.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    {/* Row 1: name + status badge */}
+                    {/* Row 1: name + status badges */}
                     <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                       <span className="truncate font-semibold text-foreground text-sm">{m.name}</span>
                       <StatusPill status={membershipTone(m.membershipStatus)} label={m.membershipStatus === "expiring" ? "Expiring" : m.membershipStatus} size="sm" />
+                      {!m.isActive && (
+                        <span className="rounded-full bg-red-500/15 px-1.5 py-0.5 text-[10px] font-bold text-red-500">Inactive</span>
+                      )}
                     </div>
                     {/* Row 2: email */}
                     <p className="truncate text-xs text-muted-foreground">{m.email ?? "No email"}</p>
@@ -307,7 +498,14 @@ export default function OwnerMembersPage() {
       {/* Bottom spacer — ensures last card clears the fixed nav on all phones */}
       <div className="h-20 lg:hidden" aria-hidden="true" />
 
-      {selectedId && <MemberDrawer memberId={selectedId} onClose={() => setSelectedId(null)} />}
+      {selectedId && (
+        <MemberDrawer
+          memberId={selectedId}
+          memberIsActive={members.find(m => m.id === selectedId)?.isActive ?? true}
+          onClose={() => setSelectedId(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   )
 }

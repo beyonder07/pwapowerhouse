@@ -9,10 +9,12 @@ import {
   Loader2,
   UserRoundCheck,
   Users,
+  BarChart2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { MetricCard, PageIntro, StatusPill, SurfaceCard } from "@/components/powerhouse"
 import { Button } from "@/components/ui/button"
+import { OperationalProfileDrawer } from "@/components/trainer/operational-profile-drawer"
 
 interface TrainerDashboardData {
   summary: {
@@ -41,6 +43,7 @@ function salaryTone(status: TrainerDashboardData["summary"]["salaryStatus"]) {
 export default function TrainerDashboardPage() {
   const [dashboard, setDashboard] = useState<TrainerDashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showProfile, setShowProfile] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -221,9 +224,19 @@ export default function TrainerDashboardPage() {
                 Update Workout Plans
               </Link>
             </Button>
+            <Button
+              variant="outline"
+              className="h-11 w-full justify-start"
+              onClick={() => setShowProfile(true)}
+            >
+              <BarChart2 className="mr-2 h-4 w-4" />
+              View My Operational Profile
+            </Button>
           </div>
         </SurfaceCard>
       </div>
+
+      {showProfile && <OperationalProfileDrawer onClose={() => setShowProfile(false)} />}
     </div>
   )
 }

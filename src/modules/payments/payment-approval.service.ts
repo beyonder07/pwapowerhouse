@@ -126,37 +126,38 @@ export class PaymentApprovalService {
       requestedStart = new Date()
     }
 
-    let startDate = new Date(requestedStart)
-    let endDate = new Date(requestedStart)
-
     if (existingMembership) {
+      // Renewal: new period starts from whichever is later — current end date or requested start date
       const currentEnd = new Date(existingMembership.end_date)
-      startDate = currentEnd > requestedStart ? currentEnd : requestedStart
-      endDate = new Date(startDate)
-      endDate.setDate(startDate.getDate() + durationDays)
+      const newStart = currentEnd > requestedStart ? currentEnd : requestedStart
+      const newEnd = new Date(newStart)
+      newEnd.setDate(newStart.getDate() + durationDays)
 
       const { error: memError } = await this.admin
         .from("memberships")
         .update({
-          start_date: (currentEnd > requestedStart ? new Date(existingMembership.start_date) : startDate).toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
+          // Keep the original enrollment start_date unchanged; only extend the end_date
+          end_date: newEnd.toISOString().split("T")[0],
           status: "active",
         })
         .eq("user_id", payment.user_id)
-      
+
       if (memError) throw memError
     } else {
-      endDate.setDate(startDate.getDate() + durationDays)
+      // First-time membership: start from the plan start date
+      const newEnd = new Date(requestedStart)
+      newEnd.setDate(requestedStart.getDate() + durationDays)
+
       const { error: memError } = await this.admin
         .from("memberships")
         .insert({
           user_id: payment.user_id,
           gym_id: payment.gym_id,
-          start_date: startDate.toISOString().split("T")[0],
-          end_date: endDate.toISOString().split("T")[0],
+          start_date: requestedStart.toISOString().split("T")[0],
+          end_date: newEnd.toISOString().split("T")[0],
           status: "active",
         })
-      
+
       if (memError) throw memError
     }
 

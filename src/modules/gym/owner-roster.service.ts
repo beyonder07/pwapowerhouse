@@ -43,6 +43,8 @@ export interface OwnerMemberRow {
   daysRemaining: number
   lastCheckIn: string | null
   lastCheckInRelative: string
+  isActive: boolean
+  daysSinceLastCheckIn: number | null
 }
 
 export async function listOwnerMembers(
@@ -62,7 +64,7 @@ export async function listOwnerMembers(
 
   let usersQuery = admin
     .from("users")
-    .select("id, name, email, gym_id, created_at", { count: "exact" })
+    .select("id, name, email, gym_id, created_at, is_active", { count: "exact" })
     .eq("role", "client")
     .order("created_at", { ascending: false })
 
@@ -74,7 +76,15 @@ export async function listOwnerMembers(
     usersQuery = usersQuery.ilike("name", `%${search.trim()}%`)
   }
 
-  if (status === "all") {
+  // Filter by active/inactive status
+  if (status === "inactive") {
+    usersQuery = usersQuery.eq("is_active", false)
+  } else if (status !== "all" && status !== "active" && status !== "expiring" && status !== "expired") {
+    // default: only show active users unless explicitly requesting inactive
+    usersQuery = usersQuery.neq("is_active", false)
+  }
+
+  if (status === "all" || status === "inactive") {
     usersQuery = usersQuery.range(offset, offset + limit - 1)
   }
 
@@ -148,6 +158,10 @@ export async function listOwnerMembers(
     const gymName = membership?.gym_id ? gymById.get(membership.gym_id) ?? null : null
     const mStatus = membershipStatus(membership?.status ?? null, membership?.end_date ?? null)
 
+    const daysSinceLastCheckIn = lastA?.date
+      ? Math.floor((Date.now() - new Date(lastA.date + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24))
+      : null
+
     return {
       id: user.id,
       name: user.name ?? user.email ?? "Member",
@@ -163,15 +177,17 @@ export async function listOwnerMembers(
       daysRemaining: daysLeft(membership?.end_date ?? null),
       lastCheckIn: lastA?.date ?? null,
       lastCheckInRelative: relativeCheckIn(lastA?.date ?? null),
+      isActive: (user as any).is_active !== false, // default true if column doesn't exist yet
+      daysSinceLastCheckIn,
     }
   })
 
   const filtered =
-    status === "all"
+    status === "all" || status === "inactive"
       ? members
       : members.filter((m) => m.membershipStatus === status)
 
-  if (status !== "all") {
+  if (status !== "all" && status !== "inactive") {
     total = filtered.length
     const paged = filtered.slice(offset, offset + limit)
     return { members: paged, total }
