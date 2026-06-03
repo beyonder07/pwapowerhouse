@@ -178,7 +178,7 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
       />
 
       {/* Panel — bottom sheet on mobile, side panel on md+ */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex h-[92dvh] md:h-full flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
         {/* Handle bar (mobile only) */}
         <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="h-1 w-10 rounded-full bg-border" />
