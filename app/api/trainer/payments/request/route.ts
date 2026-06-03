@@ -15,6 +15,9 @@ const TrainerPaymentRequestSchema = z.object({
   paymentMode: z.enum(['cash', 'upi', 'card', 'bank-transfer', 'other']),
   notes: z.string().optional(),
   screenshotUrl: z.string().optional(),
+  planStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").optional().nullable(),
+  planEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").optional().nullable(),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format").optional().nullable(),
 })
 
 export async function POST(req: NextRequest) {

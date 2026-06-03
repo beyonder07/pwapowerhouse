@@ -137,6 +137,9 @@ export default function TrainerMemberDrawer({
   })
   const [notes, setNotes] = useState("")
   const [screenshotUrl, setScreenshotUrl] = useState("")
+  const [planStartDate, setPlanStartDate] = useState("")
+  const [planEndDate, setPlanEndDate] = useState("")
+  const [paymentDate, setPaymentDate] = useState("")
   const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -255,6 +258,9 @@ export default function TrainerMemberDrawer({
           paymentMode,
           notes: notes || undefined,
           screenshotUrl: paymentMode === "upi" ? screenshotUrl : undefined,
+          planStartDate: planStartDate || undefined,
+          planEndDate: planEndDate || undefined,
+          paymentDate: paymentDate || undefined,
         }),
       })
 
@@ -270,6 +276,9 @@ export default function TrainerMemberDrawer({
       setShowPaymentForm(false)
       setNotes("")
       setScreenshotUrl("")
+      setPlanStartDate("")
+      setPlanEndDate("")
+      setPaymentDate("")
       loadDetail()
     } catch (error: any) {
       toast.error("Submission failed", { description: error.message })
@@ -653,6 +662,47 @@ export default function TrainerMemberDrawer({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Custom Dates Fields */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="req-plan-start" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Plan Start Date (Opt)
+                </Label>
+                <Input
+                  id="req-plan-start"
+                  type="date"
+                  value={planStartDate}
+                  onChange={(e) => setPlanStartDate(e.target.value)}
+                  className="text-xs bg-background border-border/60 text-foreground font-semibold"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="req-plan-end" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  Plan End Date (Opt)
+                </Label>
+                <Input
+                  id="req-plan-end"
+                  type="date"
+                  value={planEndDate}
+                  onChange={(e) => setPlanEndDate(e.target.value)}
+                  className="text-xs bg-background border-border/60 text-foreground font-semibold"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="req-payment-date" className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Date of Payment (Optional)
+              </Label>
+              <Input
+                id="req-payment-date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="text-xs bg-background border-border/60 text-foreground font-semibold"
+              />
             </div>
 
             {/* Notes Field */}

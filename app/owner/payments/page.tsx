@@ -37,6 +37,7 @@ interface OwnerRequestRow {
   id: string
   memberId: string
   trainerId: string | null
+  trainerName?: string | null
   memberName: string
   memberEmail: string
   amount: number
@@ -173,6 +174,50 @@ export default function OwnerPaymentsPage() {
 
   useEffect(() => {
     loadPayments().finally(() => setIsLoading(false))
+  }, [])
+
+  // Poll for new requests to trigger phone/browser notifications
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      if (Notification.permission === "default") {
+        Notification.requestPermission()
+      }
+    }
+
+    const checkNewRequests = async () => {
+      try {
+        const res = await fetch("/api/owner/payments/requests", { credentials: "include", cache: "no-store" })
+        const result = await res.json()
+        if (res.ok && result.success && Array.isArray(result.data)) {
+          const freshRequests: OwnerRequestRow[] = result.data
+          
+          setRequests(prevRequests => {
+            const prevIds = new Set(prevRequests.map(r => r.id))
+            const newRequests = freshRequests.filter(r => !prevIds.has(r.id))
+            
+            if (newRequests.length > 0 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+              const latest = newRequests[0]
+              const title = "New Payment Request"
+              const body = latest.createdBy === "trainer" && latest.trainerName
+                ? `Trainer ${latest.trainerName} requested ${formatCurrency(latest.amount)} for ${latest.memberName}`
+                : `Member ${latest.memberName} requested ${formatCurrency(latest.amount)}`
+              
+              new Notification(title, {
+                body,
+                icon: "/icons/icon-192.png",
+              })
+            }
+            
+            return freshRequests
+          })
+        }
+      } catch (err) {
+        console.error("Notification polling failed", err)
+      }
+    }
+
+    const intervalId = setInterval(checkNewRequests, 10000)
+    return () => clearInterval(intervalId)
   }, [])
 
   // Review Legacy Client Pending Payments
@@ -332,6 +377,11 @@ export default function OwnerPaymentsPage() {
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">{req.memberEmail}</p>
+                          {req.createdBy === "trainer" && req.trainerName && (
+                            <p className="text-xs font-semibold text-primary mt-0.5">
+                              Trainer: {req.trainerName}
+                            </p>
+                          )}
                           <div className="flex items-center gap-4 text-xs font-semibold text-foreground/80 mt-1">
                             <span className="flex items-center gap-1">
                               <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />

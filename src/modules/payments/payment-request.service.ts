@@ -11,6 +11,9 @@ export interface PaymentRequestInput {
   notes?: string
   screenshotUrl?: string
   createdBy: 'trainer' | 'member'
+  planStartDate?: string | null
+  planEndDate?: string | null
+  paymentDate?: string | null
 }
 
 export class PaymentRequestService {
@@ -112,6 +115,9 @@ export class PaymentRequestService {
         payment_mode: input.paymentMode,
         notes: input.notes || null,
         screenshot_url: input.screenshotUrl || null,
+        plan_start_date: input.planStartDate || null,
+        plan_end_date: input.planEndDate || null,
+        payment_date: input.paymentDate || null,
       })
       .select("*")
       .single()
@@ -143,10 +149,10 @@ export class PaymentRequestService {
       .eq("status", "pending")
       .lt("created_at", sevenDaysAgo.toISOString())
 
-    // Fetch pending requests with member user profiles
+    // Fetch pending requests with member user profiles and trainer profiles
     const { data, error } = await this.admin
       .from("payment_requests")
-      .select("*, users!payment_requests_member_id_fkey(name, email)")
+      .select("*, member:users!payment_requests_member_id_fkey(name, email), trainer:users!payment_requests_trainer_id_fkey(name)")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
 
@@ -156,8 +162,9 @@ export class PaymentRequestService {
       id: row.id,
       memberId: row.member_id,
       trainerId: row.trainer_id,
-      memberName: row.users?.name || "Unknown Member",
-      memberEmail: row.users?.email || "No Email",
+      memberName: row.member?.name || "Unknown Member",
+      memberEmail: row.member?.email || "No Email",
+      trainerName: row.trainer?.name || null,
       amount: Number(row.amount),
       month: row.month,
       status: row.status,
