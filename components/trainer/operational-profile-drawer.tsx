@@ -161,8 +161,12 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
   }, [])
 
   return (
-    <div className="fixed inset-0 z-50" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50">
+      {/* Backdrop — tapping this closes the drawer */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
 
       {/* Panel — bottom sheet on mobile, side panel on md+ */}
       <div className="absolute inset-x-0 bottom-0 z-10 flex max-h-[92dvh] flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
@@ -172,15 +176,19 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
           <h2 className="text-base font-bold text-foreground">My Operational Profile</h2>
           <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="space-y-6 p-4 pb-safe">
+        {/* Scrollable content — flex-1 + overflow-y-auto is the key combination */}
+        <div
+          className="flex-1 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="space-y-6 p-4 pb-28">
             {loading ? (
               <div className="flex h-48 items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
