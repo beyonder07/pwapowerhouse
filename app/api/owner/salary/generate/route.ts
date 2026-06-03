@@ -3,6 +3,7 @@ import { authenticateRequest } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
 import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import { fail, ok } from "@/src/utils/response"
+import { getEndOfMonth } from "@/src/utils/payment-dates"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
       .from("trainer_salaries")
       .select("user_id")
       .gte("month_start", monthStart)
-      .lte("month_start", monthStart.slice(0, 7) + "-31")
+      .lte("month_start", getEndOfMonth(monthStart))
 
     const existingIds = new Set((existing ?? []).map((r: any) => r.user_id))
     const toCreate = trainers.filter((t) => !existingIds.has(t.id))

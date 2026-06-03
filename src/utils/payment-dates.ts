@@ -75,3 +75,15 @@ export function encodePaymentDates(
     return `${url}?plan_start_date=${pStart}&payment_date=${pDate}`
   }
 }
+
+/**
+ * Returns the last day of the month as a string format (YYYY-MM-DD) for a given month prefix (YYYY-MM) or full ISO string.
+ */
+export function getEndOfMonth(monthStr: string): string {
+  const monthPrefix = monthStr.slice(0, 7) // "YYYY-MM"
+  const year = parseInt(monthPrefix.slice(0, 4), 10)
+  const month = parseInt(monthPrefix.slice(5, 7), 10) // 1-12
+  const lastDay = new Date(year, month, 0).getDate()
+  return `${monthPrefix}-${String(lastDay).padStart(2, "0")}`
+}
+

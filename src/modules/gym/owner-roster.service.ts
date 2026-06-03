@@ -2,6 +2,7 @@ import type { AuthContext } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
 import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import { getOwnerGymId } from "@/src/utils/owner-gym"
+import { getEndOfMonth } from "@/src/utils/payment-dates"
 
 const admin = createSupabaseServiceRoleClient()
 
@@ -269,7 +270,7 @@ export async function listOwnerTrainers(
       .select("user_id, base_salary, bonus, status, month_start")
       .in("user_id", trainerIds)
       .gte("month_start", `${thisMonth}-01`)
-      .lte("month_start", `${thisMonth}-31`),
+      .lte("month_start", getEndOfMonth(thisMonth)),
     admin.from("gyms").select("id, name"),
   ])
 
@@ -357,7 +358,7 @@ export async function listOwnerSalaries(
     .from("trainer_salaries")
     .select("id, user_id, base_salary, bonus, status, paid_at, month_start")
     .gte("month_start", month)
-    .lte("month_start", month.slice(0, 7) + "-31")
+    .lte("month_start", getEndOfMonth(month))
     .order("month_start", { ascending: false })
 
   if (salariesRes.error) {

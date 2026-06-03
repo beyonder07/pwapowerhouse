@@ -2,8 +2,10 @@ import type { AuthContext } from "@/src/middleware/auth.middleware"
 import { requireRole } from "@/src/middleware/role.middleware"
 import { createSupabaseServiceRoleClient } from "@/src/services/supabase.service"
 import { getOwnerGymId } from "@/src/utils/owner-gym"
+import { getEndOfMonth } from "@/src/utils/payment-dates"
 
 const admin = createSupabaseServiceRoleClient()
+
 
 export interface GymExpense {
   id: string
@@ -53,7 +55,8 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
 
   const monthPrefix = month.slice(0, 7) // "YYYY-MM"
   const startOfMonth = `${monthPrefix}-01`
-  const endOfMonth = `${monthPrefix}-31`
+  const endOfMonth = getEndOfMonth(month)
+
 
   // 1. Client Revenue — approved payments in this month
   const paymentsRes = await admin
