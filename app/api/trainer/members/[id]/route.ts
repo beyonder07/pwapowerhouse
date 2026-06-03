@@ -17,11 +17,25 @@ export async function GET(
 ) {
   try {
     const auth = await authenticateRequest(req)
-    requireRole(auth, ["owner"])
+    requireRole(auth, ["trainer"])
     const { id } = await params
 
     const now = new Date()
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+
+    // Verify that the trainer and the member belong to the same gym
+    const [trainerRes, memberRes] = await Promise.all([
+      admin.from("users").select("gym_id").eq("id", auth.user.id).maybeSingle(),
+      admin.from("users").select("gym_id").eq("id", id).maybeSingle(),
+    ])
+
+    if (!trainerRes.data || !memberRes.data) {
+      return fail(new Error("Trainer or Member not found"))
+    }
+
+    if (trainerRes.data.gym_id !== memberRes.data.gym_id) {
+      return fail(new Error("Unauthorized: You are not assigned to this member's gym"))
+    }
 
     const [
       userRes,
@@ -44,7 +58,6 @@ export async function GET(
     // Attendance stats
     const attendance = attendanceRes.data ?? []
     const thisMonthAttendance = attendance.filter(a => a.date >= monthStart)
-    const today = now.toISOString().split("T")[0]!
 
     // Streak
     let streak = 0
@@ -147,76 +160,6 @@ export async function GET(
       workoutPlan,
       payments: unifiedHistory,
     })
-  } catch (error) {
-    return fail(error)
-  }
-}
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const auth = await authenticateRequest(req)
-    requireRole(auth, ["owner"])
-    const { id } = await params
-
-    const body = await req.json()
-    const { startDate, endDate } = body
-
-    if (!startDate || !endDate) {
-      return fail(new Error("Start date and End date are required"))
-    }
-
-    // 1. Fetch user to check gym_id
-    const { data: user, error: userError } = await admin
-      .from("users")
-      .select("gym_id")
-      .eq("id", id)
-      .maybeSingle()
-
-    if (userError || !user) {
-      return fail(new Error("Member not found"))
-    }
-
-    // 2. Try to fetch existing membership
-    const { data: existingMembership } = await admin
-      .from("memberships")
-      .select("id")
-      .eq("user_id", id)
-      .maybeSingle()
-
-    let error;
-    if (existingMembership) {
-      // Update
-      const res = await admin
-        .from("memberships")
-        .update({
-          start_date: startDate,
-          end_date: endDate,
-          status: "active"
-        })
-        .eq("user_id", id)
-      error = res.error
-    } else {
-      // Insert
-      const res = await admin
-        .from("memberships")
-        .insert({
-          user_id: id,
-          gym_id: user.gym_id,
-          start_date: startDate,
-          end_date: endDate,
-          status: "active"
-        })
-      error = res.error
-    }
-
-    if (error) {
-      return fail(error)
-    }
-
-    return ok({ success: true })
   } catch (error) {
     return fail(error)
   }

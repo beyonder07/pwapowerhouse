@@ -39,7 +39,18 @@ interface MemberDetail {
   membership: { status: string; startDate: string; endDate: string; daysLeft: number } | null
   attendance: { total: number; thisMonth: number; streak: number; avgDurationMinutes: number | null; lastDate: string | null }
   workoutPlan: { title: string; status: string; dayCount: number; exerciseCount: number; updatedAt: string } | null
-  payments: Array<{ id: string; amount: number; planDuration: number; status: string; paymentMode: string; createdAt: string; approvedAt: string | null }>
+  payments: Array<{
+    id: string
+    amount: number
+    planDuration: number | null
+    status: string
+    paymentMode: string
+    createdAt: string
+    approvedAt: string | null
+    month?: string | null
+    createdBy?: string | null
+    screenshotUrl?: string | null
+  }>
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -47,7 +58,7 @@ function initials(n: string) { return n.split(" ").filter(Boolean).slice(0,2).ma
 function formatDate(v: string) { return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(v)) }
 function formatCurrency(v: number) { return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v) }
 function membershipTone(s: OwnerMember["membershipStatus"]) { return s === "active" ? "success" : s === "expiring" ? "warning" : "error" }
-function paymentTone(s: string) { return s === "approved" ? "success" : s === "pending" ? "warning" : "error" }
+function paymentTone(s: string) { return (s === "approved" || s === "paid") ? "success" : s === "pending" ? "warning" : "error" }
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date)
@@ -360,15 +371,35 @@ function MemberDrawer({ memberId, memberIsActive, onClose, onStatusChange }: {
                 {/* Payments */}
                 {detail.payments.length > 0 && (
                   <div className="mt-6">
-                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Payment History</p>
+                    <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Payment History & Requests</p>
                     <div className="space-y-2">
-                      {detail.payments.slice(0, 8).map(p => (
-                        <div key={p.id} className="flex items-center justify-between rounded-xl border border-border bg-card shadow-sm px-3 py-2.5">
-                          <div>
-                            <p className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</p>
-                            <p className="text-[11px] font-medium text-muted-foreground/80 mt-0.5">{formatDate(p.createdAt)} · {p.paymentMode}</p>
+                      {detail.payments.slice(0, 10).map(p => (
+                        <div key={p.id} className="flex flex-col gap-1.5 rounded-xl border border-border bg-card shadow-sm px-3 py-2.5">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-foreground">{formatCurrency(p.amount)}</p>
+                              <p className="text-[11px] font-medium text-muted-foreground/80 mt-0.5">{formatDate(p.createdAt)} · <span className="uppercase">{p.paymentMode}</span></p>
+                            </div>
+                            <StatusPill status={paymentTone(p.status)} label={p.status} size="sm" />
                           </div>
-                          <StatusPill status={paymentTone(p.status)} label={p.status} size="sm" />
+
+                          <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-border/20 text-[10px] text-muted-foreground font-semibold">
+                            {p.month && (
+                              <span className="bg-secondary/40 px-1.5 py-0.5 rounded text-foreground/80">
+                                Month: {p.month}
+                              </span>
+                            )}
+                            {p.createdBy && (
+                              <span className="bg-secondary/40 px-1.5 py-0.5 rounded text-foreground/80">
+                                {p.createdBy === "trainer" ? "Submitted by Trainer" : "Submitted by Member"}
+                              </span>
+                            )}
+                            {p.screenshotUrl && (
+                              <a href={p.screenshotUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-0.5 ml-auto">
+                                View Proof
+                              </a>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

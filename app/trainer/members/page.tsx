@@ -11,6 +11,7 @@ import {
   SurfaceCard,
 } from "@/components/powerhouse"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import TrainerMemberDrawer from "@/components/trainer/trainer-member-drawer"
 
 interface TrainerMember {
   id: string
@@ -61,6 +62,7 @@ export default function TrainerMembersPage() {
   const [status, setStatus] = useState("all")
   const [activity, setActivity] = useState("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams()
@@ -173,72 +175,85 @@ export default function TrainerMembersPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {members.map((member) => (
-            <SurfaceCard key={member.id} className="space-y-4">
-              <div className="flex items-start gap-3">
-                <Avatar className="h-12 w-12">
-                  <AvatarImage src={member.avatarUrl ?? undefined} alt={member.name} />
-                  <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
-                    {initials(member.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-base font-semibold text-foreground">
-                    {member.name}
-                  </h2>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {member.membershipPlan}
-                  </p>
+            <button
+              key={member.id}
+              onClick={() => setSelectedId(member.id)}
+              className="w-full text-left focus:outline-none"
+            >
+              <SurfaceCard interactive className="space-y-4 hover:border-primary/40 transition-colors">
+                <div className="flex items-start gap-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={member.avatarUrl ?? undefined} alt={member.name} />
+                    <AvatarFallback className="bg-primary/10 text-sm font-semibold text-primary">
+                      {initials(member.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate text-base font-semibold text-foreground">
+                      {member.name}
+                    </h2>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {member.membershipPlan}
+                    </p>
+                  </div>
+                  <StatusPill
+                    status={membershipTone(member.membershipStatus)}
+                    label={member.membershipStatusLabel}
+                    size="sm"
+                  />
                 </div>
-                <StatusPill
-                  status={membershipTone(member.membershipStatus)}
-                  label={member.membershipStatusLabel}
-                  size="sm"
-                />
-              </div>
 
-              <div className="grid gap-3">
-                <div className="flex items-start gap-2 rounded-lg bg-background p-3">
-                  <CalendarDays className="mt-0.5 h-4 w-4 text-primary" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Last attendance</p>
-                    <div className="mt-1">
-                      <StatusPill
-                        status={activityTone(member.activity)}
-                        label={member.lastAttendance}
-                        size="sm"
-                      />
+                <div className="grid gap-3">
+                  <div className="flex items-start gap-2 rounded-lg bg-background p-3">
+                    <CalendarDays className="mt-0.5 h-4 w-4 text-primary" />
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted-foreground">Last attendance</p>
+                      <div className="mt-1">
+                        <StatusPill
+                          status={activityTone(member.activity)}
+                          label={member.lastAttendance}
+                          size="sm"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-2 rounded-lg bg-background p-3">
-                  <Dumbbell className="mt-0.5 h-4 w-4 text-primary" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Workout plan</p>
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {member.currentWorkoutPlan}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {member.workoutProgress}
-                    </p>
-                  </div>
-                </div>
-
-                {member.fitnessGoal && (
                   <div className="flex items-start gap-2 rounded-lg bg-background p-3">
-                    <Target className="mt-0.5 h-4 w-4 text-primary" />
+                    <Dumbbell className="mt-0.5 h-4 w-4 text-primary" />
                     <div className="min-w-0">
-                      <p className="text-xs text-muted-foreground">Fitness goal</p>
+                      <p className="text-xs text-muted-foreground">Workout plan</p>
                       <p className="truncate text-sm font-medium text-foreground">
-                        {member.fitnessGoal}
+                        {member.currentWorkoutPlan}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {member.workoutProgress}
                       </p>
                     </div>
                   </div>
-                )}
-              </div>
-            </SurfaceCard>
+
+                  {member.fitnessGoal && (
+                    <div className="flex items-start gap-2 rounded-lg bg-background p-3">
+                      <Target className="mt-0.5 h-4 w-4 text-primary" />
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground">Fitness goal</p>
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {member.fitnessGoal}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </SurfaceCard>
+            </button>
           ))}
         </div>
+      )}
+
+      {selectedId && (
+        <TrainerMemberDrawer
+          memberId={selectedId}
+          onClose={() => setSelectedId(null)}
+        />
       )}
     </div>
   )
