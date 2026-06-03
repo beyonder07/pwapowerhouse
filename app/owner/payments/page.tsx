@@ -16,6 +16,7 @@ interface OwnerPaymentRow {
   paymentMode: "upi" | "cash"
   screenshotUrl?: string
   startDate?: string
+  paymentDate?: string
   createdAt: string
   approvedAt?: string | null
 }
@@ -53,7 +54,7 @@ export default function OwnerPaymentsPage() {
       return editedDates[payment.id]
     }
     const planStartDate = payment.startDate || new Date().toISOString().split("T")[0]
-    const paymentDate = (payment as any).paymentDate || new Date().toISOString().split("T")[0]
+    const paymentDate = payment.paymentDate || new Date().toISOString().split("T")[0]
     return { planStartDate, paymentDate }
   }
 
@@ -61,7 +62,7 @@ export default function OwnerPaymentsPage() {
     setEditedDates(prev => {
       const current = prev[paymentId] || {
         planStartDate: data?.pending.find(p => p.id === paymentId)?.startDate || new Date().toISOString().split("T")[0],
-        paymentDate: (data?.pending.find(p => p.id === paymentId) as any)?.paymentDate || new Date().toISOString().split("T")[0]
+        paymentDate: data?.pending.find(p => p.id === paymentId)?.paymentDate || new Date().toISOString().split("T")[0]
       }
       return {
         ...prev,
@@ -128,6 +129,7 @@ export default function OwnerPaymentsPage() {
 
     try {
       const dates = editedDates[id]
+      const values = editedValues[id]
       const response = await fetch("/api/owner/payments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -136,7 +138,9 @@ export default function OwnerPaymentsPage() {
           id, 
           status,
           planStartDate: status === "approved" ? (dates?.planStartDate || data?.pending.find(p => p.id === id)?.startDate || new Date().toISOString().split("T")[0]) : undefined,
-          paymentDate: status === "approved" ? (dates?.paymentDate || (data?.pending.find(p => p.id === id) as any)?.paymentDate || new Date().toISOString().split("T")[0]) : undefined
+          paymentDate: status === "approved" ? (dates?.paymentDate || data?.pending.find(p => p.id === id)?.paymentDate || new Date().toISOString().split("T")[0]) : undefined,
+          amount: status === "approved" && values?.amount !== undefined ? Number(values.amount) : undefined,
+          planDuration: status === "approved" && values?.planDuration !== undefined ? Number(values.planDuration) : undefined
         }),
       })
       const result = await response.json()
@@ -226,8 +230,26 @@ export default function OwnerPaymentsPage() {
                       </div>
                     </div>
 
-                    {/* Editable Dates for Owner Override */}
+                    {/* Editable Details for Owner Override */}
                     <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/30 text-xs my-3 bg-secondary/10 p-3 rounded-lg">
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground block">Amount (INR):</label>
+                        <input
+                          type="number"
+                          value={editedValues[payment.id]?.amount !== undefined ? editedValues[payment.id].amount : payment.amount}
+                          onChange={(e) => setValue(payment.id, "amount", e.target.value)}
+                          className="w-full bg-background border border-border/40 rounded px-2 py-1 text-foreground font-semibold focus:outline-none focus:border-primary"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="font-bold text-muted-foreground block">Plan Duration (Days):</label>
+                        <input
+                          type="number"
+                          value={editedValues[payment.id]?.planDuration !== undefined ? editedValues[payment.id].planDuration : payment.planDuration}
+                          onChange={(e) => setValue(payment.id, "planDuration", e.target.value)}
+                          className="w-full bg-background border border-border/40 rounded px-2 py-1 text-foreground font-semibold focus:outline-none focus:border-primary"
+                        />
+                      </div>
                       <div className="space-y-1">
                         <label className="font-bold text-muted-foreground block">Plan Start Date:</label>
                         <input

@@ -62,15 +62,15 @@ export class PaymentApprovalService {
   /**
    * Unified Review: Approve or Reject
    */
-  async review(input: { id: string, status: "approved" | "rejected", planStartDate?: string, paymentDate?: string }) {
+  async review(input: { id: string, status: "approved" | "rejected", planStartDate?: string, paymentDate?: string, amount?: number, planDuration?: number }) {
     if (input.status === "approved") {
-      return this.approve(input.id, input.planStartDate, input.paymentDate)
+      return this.approve(input.id, input.planStartDate, input.paymentDate, input.amount, input.planDuration)
     } else {
       return this.reject(input.id)
     }
   }
 
-  async approve(paymentId: string, customPlanStartDate?: string, customPaymentDate?: string) {
+  async approve(paymentId: string, customPlanStartDate?: string, customPaymentDate?: string, customAmount?: number, customPlanDuration?: number) {
     requireRole(this.ctx, ["owner"])
 
     // 1. Fetch the pending payment
@@ -100,6 +100,9 @@ export class PaymentApprovalService {
       payment.payment_mode
     )
 
+    const finalAmount = customAmount !== undefined ? customAmount : payment.amount
+    const finalPlanDuration = customPlanDuration !== undefined ? customPlanDuration : payment.plan_duration
+
     // 2. Update payment status & encoded dates in screenshot_url
     const { error: updatePaymentError } = await this.admin
       .from("payments")
@@ -107,7 +110,9 @@ export class PaymentApprovalService {
         status: "approved",
         approved_at: new Date().toISOString(),
         approved_by: this.ctx.user.id,
-        screenshot_url: updatedScreenshotUrl
+        screenshot_url: updatedScreenshotUrl,
+        amount: finalAmount,
+        plan_duration: finalPlanDuration
       })
       .eq("id", paymentId)
 
@@ -120,7 +125,7 @@ export class PaymentApprovalService {
       .eq("user_id", payment.user_id)
       .maybeSingle()
 
-    const durationDays = payment.plan_duration || 30
+    const durationDays = finalPlanDuration || 30
     let requestedStart = new Date(finalPlanStartDate)
     if (isNaN(requestedStart.getTime())) {
       requestedStart = new Date()
