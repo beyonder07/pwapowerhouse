@@ -18,7 +18,7 @@ export default function OfflinePage() {
       </header>
 
       {/* Content */}
-      <main className="page-scroll px-4">
+      <main className="page-scroll px-4" style={{ height: "auto" }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -60,7 +60,7 @@ export default function OfflinePage() {
 
           <div className="rounded-xl border border-border bg-card p-4 mb-6">
             <h2 className="font-semibold text-foreground text-sm mb-2">
-              Available Offline
+               Available Offline
             </h2>
             <ul className="text-sm text-muted-foreground space-y-1.5">
               <li>View your profile information</li>

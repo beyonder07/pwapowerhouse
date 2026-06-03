@@ -18,7 +18,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       </header>
 
       {/* Content */}
-      <main className="page-scroll px-4 py-6 sm:py-8">
+      <main className="page-scroll px-4 py-6 sm:py-8" style={{ height: "auto" }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

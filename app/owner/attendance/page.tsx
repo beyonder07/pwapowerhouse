@@ -194,8 +194,7 @@ export default function OwnerAttendancePage() {
   const totalPages = Math.ceil(recentCount / itemsPerPage)
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
+    <div className="max-w-6xl">
         <PageIntro
           title="Attendance"
           description="Monitor member attendance across all branches"
@@ -381,6 +380,5 @@ export default function OwnerAttendancePage() {
           )}
         </SurfaceCard>
       </div>
-    </div>
   )
 }

@@ -115,20 +115,18 @@ export default function OwnerDashboardPage() {
   /* ── Skeleton ───────────────────────────────────────────────────────── */
   if (loadingDash && !dashboard) {
     return (
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-6xl space-y-6 animate-pulse">
-          <PageIntro title="Dashboard" description="Loading command center…" />
-          <div className="h-12 rounded-xl border border-border bg-card" />
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-24 rounded-xl border border-border bg-card" />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {[1, 2].map((i) => (
-              <div key={i} className="h-64 rounded-xl border border-border bg-card" />
-            ))}
-          </div>
+      <div className="max-w-6xl space-y-6 animate-pulse">
+        <PageIntro title="Dashboard" description="Loading command center…" />
+        <div className="h-12 rounded-xl border border-border bg-card" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-24 rounded-xl border border-border bg-card" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-64 rounded-xl border border-border bg-card" />
+          ))}
         </div>
       </div>
     )
@@ -137,8 +135,7 @@ export default function OwnerDashboardPage() {
   const m = dashboard?.metrics
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
+    <div className="max-w-6xl">
         <PageIntro
           title="Dashboard"
           description="Gym command center — live pulse, trends, and alerts"
@@ -424,6 +421,5 @@ export default function OwnerDashboardPage() {
           </SurfaceCard>
         </div>
       </div>
-    </div>
   )
 }

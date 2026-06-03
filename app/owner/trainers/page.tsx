@@ -163,10 +163,10 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
 
   // Prevent background body scroll when drawer is open
   useEffect(() => {
-    const originalStyle = window.getComputedStyle(document.body).overflow
-    document.body.style.overflow = "hidden"
+    const originalStyle = document.body.style.overflowY
+    document.body.style.overflowY = "hidden"
     return () => {
-      document.body.style.overflow = originalStyle
+      document.body.style.overflowY = originalStyle
     }
   }, [])
 
@@ -176,7 +176,7 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Panel — full-screen on mobile, right-side panel on md+ */}
-      <div className="absolute inset-x-0 bottom-0 z-10 flex h-[92dvh] md:h-full flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex h-[92dvh] md:h-full min-h-0 flex-col overflow-hidden rounded-t-2xl border-t border-border bg-background shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-full md:w-[500px] md:rounded-none md:border-l md:border-t-0">
         {/* Handle bar (mobile only) */}
         <div className="flex justify-center pt-3 pb-1 md:hidden">
           <div className="h-1 w-10 rounded-full bg-border" />
@@ -191,8 +191,8 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
         </div>
 
         <div
-          className="flex-1 overflow-y-auto overscroll-contain"
-          style={{ WebkitOverflowScrolling: "touch" }}
+          className="page-scroll flex-1 min-h-0 overflow-y-auto"
+          style={{ WebkitOverflowScrolling: "touch", touchAction: "pan-y", height: "auto" }}
         >
           <div className="space-y-6 p-4 pb-28">
             {loading ? (
@@ -393,9 +393,8 @@ export default function OwnerTrainersPage() {
   const presentCount = trainers.filter(t => t.attendanceToday).length
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
-        <PageIntro title="Trainers" description="All trainers — click any card for full profile and attendance" />
+    <div className="max-w-6xl">
+      <PageIntro title="Trainers" description="All trainers — click any card for full profile and attendance" />
 
         {!isLoading && trainers.length > 0 && (
           <div className="mb-6 grid grid-cols-3 gap-4">
@@ -469,9 +468,8 @@ export default function OwnerTrainersPage() {
             </button>
           ))}
         </div>
-      </div>
 
-      {selectedId && <TrainerDrawer trainerId={selectedId} onClose={() => setSelectedId(null)} />}
-    </div>
-  )
-}
+        {selectedId && <TrainerDrawer trainerId={selectedId} onClose={() => setSelectedId(null)} />}
+      </div>
+    )
+  }

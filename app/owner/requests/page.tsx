@@ -194,7 +194,7 @@ export default function OwnerRequestsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <>
       <div className="max-w-4xl">
         <PageIntro
           title="Requests"
@@ -421,6 +421,6 @@ export default function OwnerRequestsPage() {
           setConfirmAction(null)
         }}
       />
-    </div>
+    </>
   )
 }

@@ -222,8 +222,7 @@ export default function ProfitCenterPage() {
   const calcRatio = Number(calcRev) > 0 ? ((Number(calcPay) + Number(calcEB) + Number(calcMisc)) / Number(calcRev)) * 100 : 0
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-5xl">
+    <div className="max-w-5xl">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <PageIntro title="Profit Center" description="Business intelligence, expense tracking, and net profitability" />
           <div className="flex flex-wrap items-center gap-2">
@@ -569,6 +568,5 @@ CREATE TABLE gym_revenue (
           </div>
         ) : null}
       </div>
-    </div>
   )
 }

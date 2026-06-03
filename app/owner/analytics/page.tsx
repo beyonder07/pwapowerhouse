@@ -211,8 +211,7 @@ export default function OwnerAnalyticsPage() {
   ]
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl">
+    <div className="max-w-6xl">
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <PageIntro title="Analytics" description="Revenue trends, attendance patterns, and member retention" />
 
@@ -260,6 +259,5 @@ export default function OwnerAnalyticsPage() {
         {tab === "attendance" && <AttendanceTab />}
         {tab === "retention" && <RetentionTab />}
       </div>
-    </div>
   )
 }

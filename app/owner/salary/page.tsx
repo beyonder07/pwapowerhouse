@@ -307,8 +307,7 @@ export default function OwnerSalaryPage() {
   }), [salaries])
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-4xl">
+    <div className="max-w-4xl">
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <PageIntro title="Payroll Management" description="Set salaries, adjust for attendance, and process payments" />
@@ -411,6 +410,5 @@ export default function OwnerSalaryPage() {
           </div>
         )}
       </div>
-    </div>
   )
 }
