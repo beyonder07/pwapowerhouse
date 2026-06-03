@@ -55,17 +55,15 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
   const startOfMonth = `${monthPrefix}-01`
   const endOfMonth = `${monthPrefix}-31`
 
-  // 1. Client Revenue (from payments table)
-  // We sum all completed payments where the created_at or updated_at is in the month.
-  // We'll use the 'payments' table, check status='completed'
+  // 1. Client Revenue — approved payments in this month
   const paymentsRes = await admin
     .from("payments")
-    .select("amount, status, updated_at")
+    .select("amount, status, approved_at")
     .eq("gym_id", gymId)
-    .eq("status", "completed")
-    .gte("updated_at", `${startOfMonth}T00:00:00Z`)
-    .lte("updated_at", `${endOfMonth}T23:59:59Z`)
-  
+    .eq("status", "approved")
+    .gte("approved_at", `${startOfMonth}T00:00:00Z`)
+    .lte("approved_at", `${endOfMonth}T23:59:59Z`)
+
   let clientRevenue = 0
   if (paymentsRes.data) {
     clientRevenue = paymentsRes.data.reduce((sum, p) => sum + toNumber(p.amount), 0)
@@ -84,10 +82,11 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
     .order("date", { ascending: false })
 
   if (revenueRes.error) {
-    const code = (revenueRes.error as any).code
-    if (code !== "42P01" && code !== "PGRST200" && code !== "PGRST205") {
-      throw revenueRes.error
-    }
+    // Gracefully skip if table doesn't exist (any missing-table error code)
+    const code = (revenueRes.error as any).code ?? ""
+    const msg = (revenueRes.error as any).message ?? ""
+    const isTableMissing = code === "42P01" || code.startsWith("PGRST") || msg.includes("does not exist") || msg.includes("relation")
+    if (!isTableMissing) throw revenueRes.error
   } else if (revenueRes.data) {
     manualRevenueLogs = revenueRes.data.map((r: any) => ({
       id: r.id,
@@ -140,11 +139,11 @@ export async function getProfitMetrics(ctx: AuthContext, month: string): Promise
     .order("date", { ascending: false })
 
   if (expensesRes.error) {
-    const code = (expensesRes.error as any).code
-    // if table doesn't exist, we just return 0 expenses
-    if (code !== "42P01" && code !== "PGRST200" && code !== "PGRST205") {
-      throw expensesRes.error
-    }
+    // Gracefully skip if table doesn't exist (any missing-table error code)
+    const code = (expensesRes.error as any).code ?? ""
+    const msg = (expensesRes.error as any).message ?? ""
+    const isTableMissing = code === "42P01" || code.startsWith("PGRST") || msg.includes("does not exist") || msg.includes("relation")
+    if (!isTableMissing) throw expensesRes.error
   } else if (expensesRes.data) {
     expenses = expensesRes.data.map((e: any) => ({
       id: e.id,
