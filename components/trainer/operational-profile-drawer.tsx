@@ -236,6 +236,19 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
                   />
                 </div>
 
+                {/* Behavioral Status */}
+                <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Operational Status</p>
+                    <p className="text-xs font-bold text-foreground mt-0.5">
+                      {profile.attendance.calendar.find((d: any) => d.status !== "absent")
+                        ? `Last check-in: ${formatDate(profile.attendance.calendar.find((d: any) => d.status !== "absent")!.date)}`
+                        : "No check-ins recorded this month"
+                      }
+                    </p>
+                  </div>
+                </div>
+
                 {/* Operational alerts */}
                 {profile.attendance.insights.length > 0 && (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -255,31 +268,46 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
                 <div>
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">This Month</p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                    {[
-                      { label: "Rate", value: `${profile.attendance.attendanceRate}%`, color: "text-emerald-500" },
-                      { label: "Present", value: profile.attendance.presentDays, color: "text-foreground" },
-                      { label: "Absent", value: profile.attendance.absentDays, color: profile.attendance.absentDays > 0 ? "text-red-500" : "text-foreground" },
-                      { label: "Late", value: profile.attendance.lateDays, color: profile.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground" },
-                    ].map(stat => (
-                      <div key={stat.label} className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
-                        <p className="text-[10px] font-medium text-muted-foreground/80 text-center">{stat.label}</p>
-                        <p className={`mt-0.5 text-xl font-bold leading-none text-center ${stat.color}`}>{stat.value}</p>
-                      </div>
-                    ))}
+                    <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Rate</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${
+                        profile.attendance.attendanceRate >= 80 
+                          ? "text-emerald-500" 
+                          : profile.attendance.attendanceRate >= 50 
+                            ? "text-amber-500" 
+                            : "text-red-500"
+                      }`}>{profile.attendance.attendanceRate}%</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">This Month</p>
+                    </div>
+                    <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Present</p>
+                      <p className="mt-0.5 text-xl font-bold text-foreground leading-none text-center">{profile.attendance.presentDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">of {profile.attendance.workingDays} working days</p>
+                    </div>
+                    <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${profile.attendance.absentDays > 0 ? "border-red-500/30 bg-red-500/5" : ""}`}>
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Absent</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${profile.attendance.absentDays > 0 ? "text-red-500" : "text-foreground"}`}>{profile.attendance.absentDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">{profile.attendance.absentDays} day{profile.attendance.absentDays !== 1 ? "s" : ""} missed</p>
+                    </div>
+                    <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${profile.attendance.lateDays > 0 ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
+                      <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Late</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${profile.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground"}`}>{profile.attendance.lateDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">{profile.attendance.lateDays} check-in{profile.attendance.lateDays !== 1 ? "s" : ""}</p>
+                    </div>
                   </div>
 
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Avg In Time</p>
-                        <p className="font-bold text-foreground mt-0.5">{profile.attendance.avgCheckIn ?? "—"}</p>
+                        <p className="font-bold text-foreground mt-0.5">{profile.attendance.avgCheckIn ?? "No check-ins yet"}</p>
                       </div>
                       <Clock className="h-4 w-4 text-muted-foreground/50" />
                     </div>
                     <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Total Hours</p>
-                        <p className="font-bold text-foreground mt-0.5">{profile.attendance.totalHoursWorked ?? "—"}</p>
+                        <p className="font-bold text-foreground mt-0.5">{profile.attendance.totalHoursWorked ?? "No hours logged"}</p>
                       </div>
                       <TrendingUp className="h-4 w-4 text-muted-foreground/50" />
                     </div>

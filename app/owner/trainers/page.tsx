@@ -221,6 +221,24 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                   </div>
                 </div>
 
+                {/* Behavioral Status & Contact */}
+                <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Operational Status</p>
+                    <p className="text-xs font-bold text-foreground mt-0.5">
+                      {detail.attendance.calendar.find((d: any) => d.status !== "absent")
+                        ? `Last check-in: ${formatDate(detail.attendance.calendar.find((d: any) => d.status !== "absent")!.date)}`
+                        : "No check-ins recorded this month"
+                      }
+                    </p>
+                  </div>
+                  <StatusPill 
+                    status={detail.attendance.checkedInToday ? "success" : "neutral"} 
+                    label={detail.attendance.checkedInToday ? "Checked In" : "Not Checked In Today"} 
+                    size="sm"
+                  />
+                </div>
+
                 {/* Smart Insights */}
                 {detail.attendance.insights.length > 0 && (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 shadow-sm">
@@ -233,6 +251,18 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                         <li key={i}>{insight}</li>
                       ))}
                     </ul>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {detail.phone && (
+                        <Button size="sm" variant="outline" asChild className="h-7 text-[10px] border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-bold uppercase tracking-wider">
+                          <a href={`tel:${detail.phone}`}>📞 Call Trainer</a>
+                        </Button>
+                      )}
+                      {detail.email && (
+                        <Button size="sm" variant="outline" asChild className="h-7 text-[10px] border-amber-500/30 text-amber-500 hover:bg-amber-500/10 font-bold uppercase tracking-wider">
+                          <a href={`mailto:${detail.email}`}>✉️ Email Trainer</a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -242,19 +272,29 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
                       <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Rate</p>
-                      <p className="mt-0.5 text-xl font-bold text-emerald-500 leading-none text-center">{detail.attendance.attendanceRate}%</p>
+                      <p className={`mt-0.5 text-xl font-bold leading-none text-center ${
+                        detail.attendance.attendanceRate >= 80 
+                          ? "text-emerald-500" 
+                          : detail.attendance.attendanceRate >= 50 
+                            ? "text-amber-500" 
+                            : "text-red-500"
+                      }`}>{detail.attendance.attendanceRate}%</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">This Month</p>
                     </div>
                     <div className="flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm">
                       <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Present</p>
                       <p className="mt-0.5 text-xl font-bold text-foreground leading-none text-center">{detail.attendance.presentDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">of {detail.attendance.workingDays} working days</p>
                     </div>
                     <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${detail.attendance.absentDays > 0 ? "border-red-500/30 bg-red-500/5" : ""}`}>
                       <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Absent</p>
                       <p className={`mt-0.5 text-xl font-bold leading-none text-center ${detail.attendance.absentDays > 0 ? "text-red-500" : "text-foreground"}`}>{detail.attendance.absentDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">{detail.attendance.absentDays} day{detail.attendance.absentDays !== 1 ? "s" : ""} missed</p>
                     </div>
                     <div className={`flex flex-col justify-center rounded-xl border border-border bg-card p-3 h-[72px] shadow-sm ${detail.attendance.lateDays > 0 ? "border-amber-500/30 bg-amber-500/5" : ""}`}>
                       <p className="text-[10px] font-medium text-muted-foreground/80 text-center">Late</p>
                       <p className={`mt-0.5 text-xl font-bold leading-none text-center ${detail.attendance.lateDays > 0 ? "text-amber-500" : "text-foreground"}`}>{detail.attendance.lateDays}</p>
+                      <p className="text-[8px] text-muted-foreground/60 text-center mt-1">{detail.attendance.lateDays} check-in{detail.attendance.lateDays !== 1 ? "s" : ""}</p>
                     </div>
                   </div>
 
@@ -262,14 +302,14 @@ function TrainerDrawer({ trainerId, onClose }: { trainerId: string; onClose: () 
                     <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Avg In Time</p>
-                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.avgCheckIn ?? "—"}</p>
+                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.avgCheckIn ?? "No check-ins yet"}</p>
                       </div>
                       <Clock className="h-4 w-4 text-muted-foreground/50" />
                     </div>
                     <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                       <div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">Total Hours</p>
-                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.totalHoursWorked ?? "—"}</p>
+                        <p className="font-bold text-foreground mt-0.5">{detail.attendance.totalHoursWorked ?? "No hours logged"}</p>
                       </div>
                       <TrendingUp className="h-4 w-4 text-muted-foreground/50" />
                     </div>
