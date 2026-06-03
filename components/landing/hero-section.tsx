@@ -3,7 +3,7 @@
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Smartphone } from "lucide-react"
+import { ArrowRight, LogIn } from "lucide-react"
 
 export function HeroSection() {
   return (
@@ -32,7 +32,7 @@ export function HeroSection() {
               transition={{ duration: 0.8, delay: 0.15 }}
               className="text-base md:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed"
             >
-              A space designed for those who demand more from themselves.
+              For over 25 years, we have had the humble privilege of helping our community build strength, resilience, and lasting health.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -53,13 +53,10 @@ export function HeroSection() {
                 asChild 
                 className="tap-target border-accent text-accent hover:bg-accent hover:text-white h-9 md:h-11 px-4 md:px-8 text-sm md:text-base"
               >
-                <a href="#cta" onClick={(e) => {
-                  e.preventDefault();
-                  document.getElementById('cta')?.scrollIntoView({ behavior: 'smooth' });
-                }}>
-                  <Smartphone className="mr-2 h-4 md:h-5 w-4 md:w-5" />
-                  Download App
-                </a>
+                <Link href="/login">
+                  <LogIn className="mr-2 h-4 md:h-5 w-4 md:w-5" />
+                  Login
+                </Link>
               </Button>
             </motion.div>
           </motion.div>
