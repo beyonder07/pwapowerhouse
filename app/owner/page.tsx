@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
-import { AttendanceTrendChart, RevenueBarChart } from "@/components/analytics"
+
 import { MetricCard, PageIntro, SurfaceCard } from "@/components/powerhouse"
 
 /* ── Types matching DashboardService.getOwnerDashboard() ─────────────────── */
@@ -227,32 +227,6 @@ export default function OwnerDashboardPage() {
           />
         </div>
 
-        {/* ── Charts ─────────────────────────────────────────────────── */}
-        <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SurfaceCard className="overflow-hidden p-0">
-            <div className="p-4 pb-0">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-                7-Day Revenue
-              </h3>
-            </div>
-            <RevenueBarChart
-              data={(dashboard?.trend ?? []).map((t) => ({
-                date: t.date,
-                revenue: t.revenue,
-                pendingTotal: 0,
-              }))}
-            />
-          </SurfaceCard>
-
-          <SurfaceCard className="overflow-hidden p-0">
-            <div className="p-4 pb-0">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
-                7-Day Attendance
-              </h3>
-            </div>
-            <AttendanceTrendChart data={dashboard?.trend ?? []} />
-          </SurfaceCard>
-        </div>
 
         {/* ── Alerts Row ─────────────────────────────────────────────── */}
         <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
