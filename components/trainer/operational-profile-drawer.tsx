@@ -160,6 +160,15 @@ export function OperationalProfileDrawer({ onClose }: { onClose: () => void }) {
       .finally(() => setLoading(false))
   }, [])
 
+  // Prevent background body scroll when drawer is open
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = originalStyle
+    }
+  }, [])
+
   return (
     <div className="fixed inset-0 z-50">
       {/* Backdrop — tapping this closes the drawer */}

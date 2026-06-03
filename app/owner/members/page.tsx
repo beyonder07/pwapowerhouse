@@ -82,6 +82,15 @@ function MemberDrawer({ memberId, memberIsActive, onClose, onStatusChange }: {
 
   useEffect(() => { loadDetail() }, [loadDetail])
 
+  // Prevent background body scroll when drawer is open
+  useEffect(() => {
+    const originalStyle = window.getComputedStyle(document.body).overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = originalStyle
+    }
+  }, [])
+
   // Auto-compute end date when start date or duration changes
   useEffect(() => {
     if (editStartDate && editDuration && editDuration !== "custom") {
