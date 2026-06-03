@@ -37,7 +37,7 @@ interface GymExpense {
 interface GymRevenue {
   id: string
   gymId: string
-  category: "Supplement" | "Personal Training" | "Merchandise" | "Other"
+  category: "Membership" | "Personal Training" | "Supplement" | "Day Pass" | "Locker Rental" | "Juice Bar" | "Other"
   title: string
   amount: number
   date: string
@@ -86,7 +86,7 @@ export default function ProfitCenterPage() {
 
   // Add Revenue State
   const [showAddRevenue, setShowAddRevenue] = useState(false)
-  const [newRevenue, setNewRevenue] = useState({ title: "", amount: "", category: "Supplement", date: new Date().toISOString().split("T")[0]!, notes: "" })
+  const [newRevenue, setNewRevenue] = useState({ title: "", amount: "", category: "Membership", date: new Date().toISOString().split("T")[0]!, notes: "" })
   const [isSubmittingRev, setIsSubmittingRev] = useState(false)
 
   // Add Expense State
@@ -166,7 +166,7 @@ export default function ProfitCenterPage() {
       if (!res.ok || !json.success) throw new Error(json.error || "Failed to add revenue")
       toast.success("Revenue added")
       setShowAddRevenue(false)
-      setNewRevenue({ title: "", amount: "", category: "Supplement", date: new Date().toISOString().split("T")[0]!, notes: "" })
+      setNewRevenue({ title: "", amount: "", category: "Membership", date: new Date().toISOString().split("T")[0]!, notes: "" })
       loadData()
     } catch (error) {
       if ((error as any).message !== "Setup required") {
@@ -265,7 +265,7 @@ export default function ProfitCenterPage() {
 CREATE TABLE gym_revenue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   gym_id UUID NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
-  category TEXT NOT NULL CHECK (category IN ('Supplement', 'Personal Training', 'Merchandise', 'Other')),
+  category TEXT NOT NULL CHECK (category IN ('Membership', 'Personal Training', 'Supplement', 'Day Pass', 'Locker Rental', 'Juice Bar', 'Other')),
   title TEXT NOT NULL,
   amount NUMERIC NOT NULL,
   date DATE NOT NULL,
@@ -466,9 +466,12 @@ CREATE TABLE gym_revenue (
                           <Select value={newRevenue.category} onValueChange={v => setNewRevenue({...newRevenue, category: v})}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Supplement">Supplement</SelectItem>
+                              <SelectItem value="Membership">Membership</SelectItem>
                               <SelectItem value="Personal Training">Personal Training</SelectItem>
-                              <SelectItem value="Merchandise">Merchandise</SelectItem>
+                              <SelectItem value="Supplement">Supplement</SelectItem>
+                              <SelectItem value="Day Pass">Day Pass</SelectItem>
+                              <SelectItem value="Locker Rental">Locker Rental</SelectItem>
+                              <SelectItem value="Juice Bar">Juice Bar / Cafe</SelectItem>
                               <SelectItem value="Other">Other</SelectItem>
                             </SelectContent>
                           </Select>

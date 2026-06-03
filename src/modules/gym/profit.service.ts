@@ -20,7 +20,7 @@ export interface GymExpense {
 export interface GymRevenue {
   id: string
   gymId: string
-  category: "Supplement" | "Personal Training" | "Merchandise" | "Other"
+  category: "Membership" | "Personal Training" | "Supplement" | "Day Pass" | "Locker Rental" | "Juice Bar" | "Other"
   title: string
   amount: number
   date: string
