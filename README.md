@@ -17,9 +17,10 @@ Powerhouse solves a real operational problem faced by independent gyms and fitne
 This platform replaces all of that with a unified, role-partitioned digital operating system — deployable as a PWA from a single URL with no native app installation required.
 
 **Target Users:**
+
 | Persona | Pain Point Solved |
 |---|---|
-| Gym Owners | Blind spots in revenue, manual payroll, no real-time alerts |
+| Gym Owners | Revenue blind spots, manual payroll, no real-time operational alerts |
 | Personal Trainers | No digital client CRM, no attendance proof, manual billing |
 | Members | No self-service portal, no digital payment receipts |
 
@@ -29,12 +30,13 @@ This platform replaces all of that with a unified, role-partitioned digital oper
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Next.js 16 (App Router)                  │
+│                     Next.js 16 (App Router)                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐ │
 │  │  /owner/**   │  │ /trainer/**  │  │      /client/**        │ │
-│  │  Dashboard   │  │  Client CRM  │  │   Self-Service Portal  │ │
-│  │  Analytics   │  │  GPS Check-in│  │   Payment Tracking     │ │
-│  │  Payroll     │  │  Billing     │  │   Workout Plans        │ │
+│  │  Command     │  │  Client CRM  │  │   Self-Service Portal  │ │
+│  │  Center      │  │  GPS Check-in│  │   Payment Tracking     │ │
+│  │  Payroll &   │  │  Billing &   │  │   Workout Plans        │ │
+│  │  Analytics   │  │  Workouts    │  │   Attendance Log       │ │
 │  └──────────────┘  └──────────────┘  └────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -54,155 +56,103 @@ This platform replaces all of that with a unified, role-partitioned digital oper
 
 **Key Architectural Decisions:**
 
-- **App Router (Next.js 16)** — Nested layouts per role enforce session isolation and reduce shared-state bugs
-- **Security Definer RPCs** — All sensitive mutations (approve payment, check-in, salary) are executed inside PostgreSQL functions with `SECURITY DEFINER` + `SET search_path = ''`, eliminating SQL injection vectors and bypassing broken RLS edge cases
-- **Row Level Security** — Every table is protected by role-aware policies (`current_app_role()`) that dynamically resolve identity via `auth.uid()` — no static role mapping tables
-- **Atomic Transactions** — Payment approval, membership extension, and salary disbursement are wrapped in single PL/pgSQL blocks with `SELECT ... FOR UPDATE` pessimistic locking to prevent race conditions
-- **Offline-First PWA** — Service Worker with versioned cache invalidation via `/version.json` polling; cache is auto-cleaned on each app deploy
+- **App Router (Next.js 16)** — Nested layouts per role enforce session isolation and eliminate shared-state bugs at the routing level
+- **Database-Native Business Logic** — All sensitive mutations (payment approval, attendance, salary) execute inside PostgreSQL stored procedures, keeping business rules close to the data
+- **Row Level Security** — Every table is protected by role-aware policies that dynamically resolve identity at the database layer — no application-level role enforcement that can be bypassed
+- **Atomic Transactions** — Payment approval, membership extension, and payroll are single transactional units — no partial failures or race conditions possible
+- **Offline-First PWA** — Service Worker with versioned cache invalidation ensures the app works through spotty gym Wi-Fi and auto-updates on each deployment
 
 ---
 
-## 🔐 Security Engineering
+## 🏢 Owner Command Center
 
-### Multi-Layer Defense Model
+The owner dashboard is the operational heart of Powerhouse. It surfaces real-time business intelligence and automates tasks that would otherwise require manual tracking across spreadsheets, WhatsApp groups, and paper registers.
 
-```sql
--- Layer 1: Role helper (immutable, security definer)
-CREATE OR REPLACE FUNCTION public.current_app_role()
-RETURNS text LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path = public AS $$
-  SELECT role FROM public.users WHERE id = auth.uid() LIMIT 1;
-$$;
+### 📊 Live Analytics & Revenue Intelligence
+- **Real-time Pulse Metrics** — Today's check-ins, active membership count, monthly revenue, and trainer headcount at a glance
+- **Revenue Trend Charts** — Daily check-in and revenue overlays to identify high-performing days and seasonal patterns
+- **Expiring Membership Alerts** — Automatic flagging of members whose plans expire within a configurable window, enabling proactive outreach before churn
+- **Inactive Member Detection** — Surfaces members who haven't checked in recently so trainers can follow up
 
--- Layer 2: Policy using role helper (no table joins needed at policy level)
-CREATE POLICY members_trainer_assigned_read ON public.members
-  FOR SELECT TO authenticated
-  USING (trainer_id = public.current_trainer_id());
+### 💰 Profit Center & Expense Management
+- **Revenue Tracking** — Full payment history with source attribution (trainer-assisted, self-paid, owner-entered)
+- **Expense Logging** — Operational cost entries with category tags for utilities, equipment, and salaries
+- **Net Profitability View** — Real revenue minus logged expenses in a unified finance panel
 
--- Layer 3: Atomic RPC with pessimistic lock (prevents double-spend)
-SELECT * FROM public.payment_requests
-WHERE id = p_request_id AND status = 'pending'
-FOR UPDATE; -- Row locked for entire transaction
-```
+### 👥 Trainer Payroll Automation
+- **Salary Records** — Monthly payroll entries per trainer with base salary and bonus components
+- **Payment Status Tracking** — Pending / processing / paid status per cycle with timestamps
+- **Trainer Performance Context** — Attendance records and assigned member counts surfaced alongside salary data
 
-**Implemented Controls:**
-- Database-level rate limiting via `consume_rate_limit()` sliding window buckets — prevents OTP brute force
-- Unique partial indexes on `payment_requests (member_id, month) WHERE status = 'pending'` — eliminates duplicate pending requests
-- `idx_memberships_one_active_per_user` unique partial index — enforces one active membership per member at DB level
-- Trainer-member gym co-location verified inside RLS INSERT policy — trainer cannot bill a member from a different gym branch
-- Govt ID documents stored in private bucket (`govt-docs`) with owner-only RLS — zero public exposure
+### ✅ Revenue Approval Workflow
+- **Payment Request Queue** — All trainer-submitted and member-submitted payment requests appear in a structured approval panel
+- **Contextual Verification** — Request details include trainer name, member details, plan dates, payment mode, and optional screenshot proof
+- **One-Click Approve / Reject** — Approval atomically creates the payment record and extends the membership in a single database operation
+- **Push Notifications** — Owner receives an instant browser notification whenever a new payment request is submitted
 
----
-
-## 💰 Revenue Workflow Engine
-
-The core business value of Powerhouse is its **two-phase payment approval pipeline**, which prevents both trainer fraud and member non-payment simultaneously.
-
-### Trainer-Initiated Payment Flow
-
-```
-Trainer submits payment request
-        │
-        ▼
-payment_requests table (status: pending)
-│  member_id, trainer_id, amount, month, mode, screenshot_url
-│  + plan_start_date, plan_end_date, payment_date (trainer-specified)
-        │
-        ▼
-Owner receives push notification
-        │
-        ├── APPROVE ──▶ review_trainer_payment_request() RPC
-        │                   ├── Lock request row (FOR UPDATE)
-        │                   ├── Validate no duplicate payment for month
-        │                   ├── INSERT into payments (with approved_by, approved_at)
-        │                   ├── UPSERT memberships (extend end_date safely)
-        │                   └── Return { success, requestId, status }
-        │
-        └── REJECT ──▶ Update status = 'rejected', add review_note
-```
-
-**Race Condition Prevention:**
-```sql
--- Double-spend guard at DB layer (not just application layer)
-CREATE UNIQUE INDEX unique_member_month_payment
-ON public.payments (user_id, month)
-WHERE status IN ('approved', 'paid', 'pending')
-  AND created_at >= '2026-06-03 00:00:00+00';
-```
-
-### Membership Extension Logic
-
-```sql
--- Smart date calculation: extends from last known active date, not always today
-v_base_end := GREATEST(v_membership.end_date, current_date);
-v_new_end  := v_base_end + v_plan_duration_days;
-```
-This single line of business logic ensures backdated renewals don't create gaps, and future renewals don't reset unfairly — a detail most gym software gets wrong.
+### 🏋️ Member & Trainer Management
+- **Member CRM** — Full member roster with membership status, plan dates, assigned trainer, and government ID on file
+- **Trainer Directory** — Trainer profiles with attendance history, salary records, and assigned member lists
+- **Multi-Branch Support** — Manage members and trainers across multiple gym locations from a single dashboard
 
 ---
 
-## 📍 GPS Attendance Verification
+## 🏋️ Trainer Operational Suite
 
-Trainers and members are geofenced to their assigned gym branch using the **Haversine formula** implemented as a PostgreSQL function — not client-side JavaScript.
+### Client Portfolio Management
+- **Assigned Member Drawer** — Full client cards showing membership status, attendance history, fitness goals, and billing history
+- **Billing Assistant** — Submit payment renewals on behalf of clients — supporting cash, card, UPI, and screenshot upload — with configurable plan start and end date overrides
+- **Workout Plan Builder** — Create and assign structured weekly split routines with per-exercise sets, reps, and notes stored as flexible structured data
 
-```sql
-CREATE OR REPLACE FUNCTION public.haversine_meters(
-  lat1 double precision, lon1 double precision,
-  lat2 double precision, lon2 double precision
-) RETURNS double precision ...
-
--- Used inside check_in_trainer_attendance() RPC:
-v_distance := public.haversine_meters(
-  p_latitude, p_longitude,
-  v_branch.latitude, v_branch.longitude
-);
-
-IF v_distance > LEAST(v_branch.radius_meters, 150) THEN
-  RAISE EXCEPTION 'Trainer not within gym radius';
-END IF;
-```
-
-**Why server-side?** Client-side geofence checks can be spoofed via browser DevTools. By computing distance inside a `SECURITY DEFINER` function, the result is cryptographically tied to the authenticated session.
+### GPS-Verified Attendance
+- Trainers check in via mobile browser; location is validated server-side against their assigned branch radius
+- Attendance is only recorded if the trainer is physically within the gym premises — cannot be faked from a remote location
+- Late arrival is automatically flagged based on configured operating hours
 
 ---
 
-## 📊 Database Schema (Condensed)
+## 📱 Member Self-Service Portal
 
-```
-users          → gyms (via gym_id)
-  └─ trainers  → trainer_salary_records
-  └─ members   → memberships
-               → attendance (+ GPS coords, distance)
-               → payments   (+ month, source, approved_by)
-               → trainer_workout_plans (JSONB split definitions)
-
-payment_requests → (approval pipeline) → payments + memberships
-requests         → (legacy approval: trainer-attendance, member-signup)
-rate_limit_buckets → (sliding window, keyed by user+action)
-gym_branches    → (multi-branch GPS radii)
-```
-
-**JSONB Usage:**
-- `trainer_workout_plans.split` stores the full weekly workout split (exercises, sets, reps) as a typed JSONB array — enabling flexible schema evolution without table migrations for plan content changes
+- **Membership Status Dashboard** — Active plan, expiry date, days remaining, and gym branch info
+- **One-Tap Check-In** — Geolocation-verified attendance directly from the member's mobile browser
+- **Payment History** — Full record of approved payments with dates and amounts
+- **Workout Plans** — View trainer-assigned split routines and progress notes
+- **Profile Management** — Update profile photo, contact details, and view government ID on file
 
 ---
 
-## 🎛️ Feature Matrix
+## 🔐 Security Architecture
+
+Powerhouse uses a layered security model where protection is enforced at the database layer — not just the application layer.
+
+- **Role-Based Access Control** — Three distinct roles (owner, trainer, client) with policies enforced at the database level; no role elevation possible from the client side
+- **Row Level Security** — Every table in the system has RLS enabled; queries automatically filter to only the data each role is permitted to see
+- **Atomic Financial Operations** — Payment approval uses pessimistic locking at the database level, preventing double-payment races even under concurrent requests
+- **Duplicate Prevention** — Database-level unique constraints prevent duplicate pending payment requests per member per billing cycle
+- **Rate-Limited Authentication** — OTP and authentication flows are protected by a server-side rate limiter implemented at the database layer — no external infrastructure required
+- **Private Document Storage** — Government-issued identity documents are stored in a private storage bucket accessible only to the owner role
+- **Server-Side GPS Validation** — Geofence checks are computed server-side inside stored procedures, not client-side — cannot be bypassed via browser DevTools
+
+---
+
+## 📊 Feature Matrix
 
 | Feature | Owner | Trainer | Member |
 |---|:---:|:---:|:---:|
 | Live Analytics Dashboard | ✅ | — | — |
 | Revenue & Expense Tracking | ✅ | — | — |
-| Payroll Management | ✅ | 👁 (view own) | — |
+| Payroll Automation | ✅ | 👁 view own | — |
 | Payment Request Approval | ✅ | — | — |
-| Member Management | ✅ | 👁 (assigned) | — |
-| Attendance Monitoring | ✅ | ✅ (self) | ✅ (self) |
+| Push Notifications | ✅ | — | — |
+| Member Management CRM | ✅ | 👁 assigned | — |
+| Attendance Monitoring | ✅ | ✅ | ✅ |
 | GPS-Verified Check-In | — | ✅ | ✅ |
 | Client Billing Submission | — | ✅ | ✅ |
-| Workout Plan Management | — | ✅ | 👁 (view) |
-| Push Notifications | ✅ | — | — |
+| Workout Plan Management | — | ✅ | 👁 view |
+| Profit Center | ✅ | — | — |
+| Expiry & Inactivity Alerts | ✅ | — | — |
+| Profile & Document Upload | ✅ | ✅ | ✅ |
 | PWA Offline Mode | ✅ | ✅ | ✅ |
-| Profile & Govt ID Upload | ✅ | ✅ | ✅ |
 
 ---
 
@@ -211,19 +161,19 @@ gym_branches    → (multi-branch GPS radii)
 | Layer | Technology | Version | Rationale |
 |---|---|---|---|
 | Framework | Next.js App Router | 16.2.0 | Nested layouts for role isolation, SSR for auth-gated pages |
-| Language | TypeScript | 5.7.3 | Strict types across Supabase responses and RPC return shapes |
-| Database | PostgreSQL (Supabase) | Latest | RLS, partial indexes, PL/pgSQL for atomic business logic |
+| Language | TypeScript | 5.7.3 | End-to-end type safety across API responses and database calls |
+| Database | PostgreSQL (Supabase) | Latest | RLS, partial indexes, stored procedures for atomic business logic |
 | Auth | Supabase GoTrue | — | JWT + Row Level Security, OTP-based password reset |
-| UI Components | Radix UI + shadcn/ui | — | Headless, accessible primitives with custom styling |
-| Charts | Recharts | 2.15.0 | Revenue trend, attendance analytics |
+| UI Components | Radix UI + shadcn/ui | — | Headless, accessible primitives |
+| Charts | Recharts | 2.15.0 | Revenue trend and attendance analytics |
 | Animations | Framer Motion | 12.x | Page transitions, micro-interactions |
 | 3D Graphics | React Three Fiber | 9.x | Landing page hero visuals |
 | Smooth Scroll | Lenis | 1.1.x | Native-feel scroll on mobile PWA |
 | Forms | React Hook Form + Zod | — | Type-safe form validation |
-| State | SWR | 2.x | Stale-while-revalidate data fetching |
-| Offline | Service Worker | — | Versioned cache with auto-cleanup |
+| Data Fetching | SWR | 2.x | Stale-while-revalidate with automatic revalidation |
+| Offline | Service Worker | — | Versioned cache with automatic cleanup on deploy |
 | Analytics | Vercel Analytics | — | Real-world usage telemetry |
-| Deployment | Vercel | — | Edge functions, global CDN |
+| Deployment | Vercel | — | Edge network, global CDN |
 
 ---
 
@@ -234,42 +184,39 @@ app/
 ├── owner/             # Owner-only routes (analytics, payroll, approvals)
 │   ├── page.tsx       # Live dashboard (metrics, alerts, expiring memberships)
 │   ├── analytics/     # Revenue trend charts
-│   ├── payments/      # Payment history
+│   ├── payments/      # Full payment history
 │   ├── requests/      # Payment approval queue
-│   ├── salary/        # Trainer payroll
-│   ├── profit-center/ # Expense tracking
-│   ├── trainers/      # Trainer management
+│   ├── salary/        # Trainer payroll management
+│   ├── profit-center/ # Expense and profitability tracking
+│   ├── trainers/      # Trainer directory and management
 │   └── members/       # Member CRM
 ├── trainer/           # Trainer-only routes
 │   ├── dashboard/     # Trainer home (stats, GPS check-in)
-│   ├── clients/       # Assigned member drawer
+│   ├── clients/       # Assigned member portfolio
 │   ├── workouts/      # Workout plan builder
 │   ├── salary/        # Salary history view
-│   └── attendance/    # Attendance log
+│   └── attendance/    # Personal attendance log
 ├── client/            # Member self-service portal
-│   ├── page.tsx       # Member home (membership status, attendance)
-│   ├── payments/      # Payment history & request submission
-│   └── workouts/      # View assigned workout plans
-├── api/               # Next.js API routes (server-side helpers)
-├── login/ signup/     # Auth flows
-└── layout.tsx         # Root layout (PWA metadata, manifest, theme)
+│   ├── page.tsx       # Membership status and attendance
+│   ├── payments/      # Payment history and request submission
+│   └── workouts/      # Assigned workout plans
+├── api/               # Server-side API routes
+├── login/ signup/     # Auth flows with OTP password reset
+└── layout.tsx         # Root layout (PWA manifest, theme, offline guard)
 
 components/
 ├── powerhouse/        # Domain-specific components (MetricCard, PageIntro)
-├── shell/             # Navigation shells per role
+├── shell/             # Role-specific navigation shells
 ├── analytics/         # Chart components
-├── attendance/        # Check-in UI
-└── ui/                # shadcn/ui base components
+├── attendance/        # Check-in UI components
+└── ui/                # shadcn/ui base component library
 
-supabase/migrations/
-├── 202604300001_powerhouse_existing_schema.sql   # Core tables + RLS
-├── 202604300002_powerhouse_runtime_rpcs.sql      # Haversine, rate limiter, GPS check-in
-├── 202605020001_powerhouse_mvp_core.sql          # Gyms, memberships, multi-branch
-├── 202605160001_trainer_panel_operational_scope.sql # Workout plans, salary records
-├── 202605180001_trainer_daily_attendance.sql     # Daily attendance tracking
-├── 202605180002_trainer_operating_hours.sql      # Operating hours config
-├── 202606030002_payment_requests.sql             # Payment request pipeline + approval RPC
-└── 202606030003_payment_requests_trainer_dates.sql # Trainer date override fields
+supabase/
+├── Core Schema        # Users, roles, gym branches, multi-tenant structure
+├── Attendance Engine  # GPS check-in, Haversine validation, audit trail
+├── Payment Workflow   # Approval pipeline, atomic membership extension
+├── Payroll Module     # Salary records, bonus tracking, payment cycles
+└── Multi-Branch       # Gym location management, radius configuration
 ```
 
 ---
@@ -278,7 +225,7 @@ supabase/migrations/
 
 ### Prerequisites
 - Node.js 20+, pnpm
-- Supabase project (or local Supabase CLI)
+- Supabase project
 
 ### Environment Variables
 
@@ -300,14 +247,9 @@ pnpm dev
 
 ### Database Setup
 
-Apply migrations in order against your Supabase project:
-
 ```bash
-# Via Supabase CLI
+# Apply migrations via Supabase CLI
 supabase db push
-
-# Or manually via Supabase SQL Editor — apply files in
-# supabase/migrations/ in chronological order
 ```
 
 ---
@@ -315,28 +257,28 @@ supabase db push
 ## 🎓 Engineering Highlights
 
 ### 1. Atomic Financial Transactions
-Payment approval is not a REST endpoint — it's a single PostgreSQL stored procedure (`review_trainer_payment_request`) that atomically: (a) locks the request row, (b) validates no duplicate payment, (c) inserts the payment record with full audit trail, and (d) extends the membership. No application-layer orchestration means no partial failures.
+Payment approval is not a REST endpoint — it is a single database stored procedure that atomically locks the request, validates no duplicate payment exists for the billing cycle, creates the payment record with a full audit trail, and extends the membership. No application-layer orchestration means no partial failure states.
 
-### 2. Server-Side Rate Limiting Without Redis
-`consume_rate_limit()` implements a sliding window rate limiter entirely in PostgreSQL using `INSERT ... ON CONFLICT DO UPDATE` on a `rate_limit_buckets` table. No Redis, no external infrastructure — the same database that stores data also enforces security rules.
+### 2. Smart Membership Extension Logic
+The system handles three renewal scenarios correctly without conditional branches in application code: renewing before expiry stacks onto the current end date, renewing after expiry starts from today, and backdated renewals never reset future dates. A single database expression handles all three cases.
 
-### 3. Zero-Trust RLS Architecture
-RLS policies never trust application-layer claims. Every policy calls `auth.uid()` and `current_app_role()` (a `SECURITY DEFINER` function) which reads role from the database — not from a JWT claim that could be forged.
+### 3. Server-Side Geofencing
+GPS attendance validation happens inside a database stored procedure — not in client JavaScript. This means the geofence cannot be bypassed by modifying browser state, spoofing coordinates in DevTools, or replaying API requests. The distance calculation is tied to the authenticated database session.
 
-### 4. Smart Membership Extension
-The `GREATEST(end_date, current_date)` pattern handles three scenarios correctly: (a) renewing before expiry (stacks onto current end), (b) renewing after expiry (starts from today), (c) backdated renewal (doesn't reset future dates). One SQL expression replaces what would otherwise be multiple conditional branches in application code.
+### 4. Database-Native Rate Limiting
+Authentication rate limiting is implemented entirely in PostgreSQL using atomic upsert operations on a sliding window structure. No Redis, no external cache, no additional infrastructure — the same database that stores application data also enforces security policies.
 
 ### 5. Versioned PWA Cache Strategy
-The service worker fetches `/version.json` on every install event — built by a prebuild script — allowing instant cache invalidation on each deploy without requiring users to manually clear storage. Old caches are cleaned on activate.
+A prebuild script generates a `version.json` on every deployment. The Service Worker fetches this on install and uses it to namespace the cache — old caches are automatically purged on activate. Users always receive fresh assets without needing to clear browser storage manually.
 
 ---
 
 ## 📈 Scalability Considerations
 
-- **Multi-Gym Ready**: Schema already has `gyms` table with `gym_id` FK on `users` — multi-tenant expansion requires only auth-level gym scoping in RLS policies
-- **Branch Scalability**: `gym_branches` table supports unlimited branches per gym with independent GPS radii
-- **Payment Audit Trail**: Every payment records `source`, `created_by`, `approved_by`, `approved_at` — full chain of custody for financial compliance
-- **Index Strategy**: Partial unique indexes (e.g., one active membership per user, one pending request per member per month) enforce business invariants at the DB layer without application-level locking
+- **Multi-Gym Ready** — The schema is structured around a `gyms` entity with gym-scoped user assignments, making multi-tenant expansion a configuration-level change rather than a schema redesign
+- **Multi-Branch Support** — Each gym supports unlimited branches with independent GPS radii and can route members and trainers to specific locations
+- **Financial Audit Trail** — Every payment record captures source, submitter role, approver identity, and approval timestamp — full chain of custody for compliance and dispute resolution
+- **Business Invariants at the DB Layer** — Duplicate memberships, duplicate pending requests, and invalid role assignments are prevented by partial unique indexes — not application-level guards that can be bypassed
 
 ---
 
@@ -344,16 +286,15 @@ The service worker fetches `/version.json` on every install event — built by a
 
 > **For recruiters reviewing this project:**
 
-**3-Line Summary:**
-- Engineered a full-stack SaaS Gym Management PWA (Next.js 16 + Supabase) with atomic payment approval workflows, GPS-verified attendance, and real-time owner notifications — serving owner, trainer, and member roles from a single codebase.
-- Implemented a PostgreSQL-native rate limiter and Haversine geofencing inside `SECURITY DEFINER` RPCs, ensuring server-side enforcement of business rules without any Redis or external infrastructure dependency.
-- Designed a zero-trust RLS architecture where every data access policy resolves identity dynamically via `auth.uid()` — preventing cross-tenant data leakage even if JWT claims were manipulated.
+- Engineered a full-stack multi-role SaaS PWA (Next.js 16 + Supabase) serving gym owners, trainers, and members from a single codebase — featuring live analytics, payroll automation, GPS attendance, and a two-phase revenue approval workflow
+- Implemented atomic financial operations using PostgreSQL stored procedures with pessimistic locking, ensuring payment approval and membership extension never produce partial or inconsistent state under concurrent load
+- Designed a zero-trust Row Level Security architecture where all data access is enforced at the database layer, with server-side GPS geofencing and database-native rate limiting that cannot be bypassed from the client
 
 ---
 
 ## 📄 License
 
-Private — All rights reserved. Contact the repository owner for licensing inquiries.
+Private — All rights reserved.
 
 ---
 
