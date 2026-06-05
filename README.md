@@ -358,5 +358,5 @@ Private — All rights reserved. Contact the repository owner for licensing inqu
 ---
 
 <div align="center">
-  Built with ⚡ by the Powerhouse team
+  Built with ⚡ by <a href="https://github.com/beyonder07">Rajul Mishra</a>
 </div>
