@@ -273,12 +273,51 @@ A prebuild script generates a `version.json` on every deployment. The Service Wo
 
 ---
 
-## 📈 Scalability Considerations
+## 📈 Scalability & Multi-Branch Architecture
 
-- **Multi-Gym Ready** — The schema is structured around a `gyms` entity with gym-scoped user assignments, making multi-tenant expansion a configuration-level change rather than a schema redesign
-- **Multi-Branch Support** — Each gym supports unlimited branches with independent GPS radii and can route members and trainers to specific locations
-- **Financial Audit Trail** — Every payment record captures source, submitter role, approver identity, and approval timestamp — full chain of custody for compliance and dispute resolution
-- **Business Invariants at the DB Layer** — Duplicate memberships, duplicate pending requests, and invalid role assignments are prevented by partial unique indexes — not application-level guards that can be bypassed
+Powerhouse is designed to serve both independent gyms and growing fitness brands operating multiple locations — from day one.
+
+### Current Operational Scale
+
+This platform is actively managing **2 gym branches** with **200+ members** across both locations:
+
+| Metric | Status |
+|---|---|
+| Active Members | 200+ |
+| Gym Branches | 2 (Indira Chowk & Pathik Chowk) |
+| Roles Served | Owner, Trainers, Members |
+| Attendance Method | GPS-verified per branch |
+| Revenue Management | Approval-based, fully digital |
+
+### Multi-Branch Architecture
+
+The platform's data model is built branch-aware from the ground up:
+
+- **Branch-specific GPS geofencing** — each branch has its own location coordinates and attendance radius; members and trainers can only check in from their assigned location
+- **Branch-level user assignment** — trainers and members are routed to their branch at the database level, not the application layer
+- **Centralized owner dashboard** — the owner sees analytics, approvals, payroll, and attendance across all branches from a single view, with no branch-switching required
+- **Independent revenue tracking per branch** — payments, expenses, and membership data are branch-scoped, enabling per-location profitability analysis
+
+### Traffic Characteristics
+
+Gym workloads are operational rather than high-throughput — the platform is optimized for reliability and data integrity at low-to-moderate request volume:
+
+- **Peak load** — Attendance check-ins cluster during morning and evening gym hours
+- **Steady load** — Dashboard queries, membership status checks, and payment approvals throughout the day
+- **Batch operations** — Monthly payroll calculations and membership expiry scans
+
+At 200+ active members across 2 branches, production traffic remains well within low single-digit requests per second — making the Next.js + Supabase stack highly cost-efficient with no overprovisioning required.
+
+### Future Growth Path
+
+The architecture is designed to scale without rewrites:
+
+- **Franchise expansion** — Add new gym brands as separate tenants with isolated data boundaries
+- **More branches** — New locations are a database record, not a deployment
+- **Centralized cross-branch analytics** — Revenue, attendance, and payroll reporting aggregated across all locations
+- **Background job processing** — Membership expiry reminders, automated salary disbursement triggers
+- **Real-time notification pipelines** — Expand beyond owner push notifications to trainer and member alerts
+- **Enterprise reporting** — Export-ready financial and operational reports for franchise-level oversight
 
 ---
 
