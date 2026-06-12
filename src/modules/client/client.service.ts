@@ -227,12 +227,18 @@ export class ClientService {
       throw new ForbiddenError("Please assign yourself to a gym branch first")
     }
 
+    const resolvedStartDate = input.startDate || new Date().toISOString().split("T")[0]
+    const resolvedPaymentDate = input.paymentDate || new Date().toISOString().split("T")[0]
+
     const encodedScreenshotUrl = encodePaymentDates(
       input.screenshotUrl,
-      input.startDate || new Date().toISOString().split("T")[0],
-      input.paymentDate || new Date().toISOString().split("T")[0],
+      resolvedStartDate,
+      resolvedPaymentDate,
       input.paymentMode
     )
+
+    // Derive YYYY-MM month from the plan start date (required NOT NULL column)
+    const month = resolvedStartDate.slice(0, 7)
 
     const { data, error } = await this.ctx.supabase
       .from("payments")
@@ -243,7 +249,10 @@ export class ClientService {
         plan_duration: input.planDuration,
         payment_mode: input.paymentMode,
         screenshot_url: encodedScreenshotUrl,
-        status: "pending"
+        status: "pending",
+        month,
+        source: "member",
+        created_by: "member",
       })
       .select("*")
       .single()
