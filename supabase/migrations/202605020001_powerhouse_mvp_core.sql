@@ -59,24 +59,32 @@ create unique index if not exists idx_memberships_one_active_per_user
   on public.memberships(user_id)
   where status = 'active';
 
-insert into public.memberships (user_id, gym_id, start_date, end_date, status)
-select
-  m.user_id,
-  u.gym_id,
-  m.start_date,
-  m.expiry_date,
-  case when m.status = 'active' and m.expiry_date >= current_date then 'active' else 'expired' end
-from public.members m
-join public.users u on u.id = m.user_id
-where u.gym_id is not null
-  and not exists (
-    select 1
-    from public.memberships existing
-    where existing.user_id = m.user_id
-      and existing.start_date = m.start_date
-      and existing.end_date = m.expiry_date
-  )
-on conflict do nothing;
+-- Migrate existing member rows into memberships (safe for fresh/preview databases)
+do $$
+begin
+  if exists (
+    select from pg_tables where schemaname = 'public' and tablename = 'members'
+  ) then
+    insert into public.memberships (user_id, gym_id, start_date, end_date, status)
+    select
+      m.user_id,
+      u.gym_id,
+      m.start_date,
+      m.expiry_date,
+      case when m.status = 'active' and m.expiry_date >= current_date then 'active' else 'expired' end
+    from public.members m
+    join public.users u on u.id = m.user_id
+    where u.gym_id is not null
+      and not exists (
+        select 1
+        from public.memberships existing
+        where existing.user_id = m.user_id
+          and existing.start_date = m.start_date
+          and existing.end_date = m.expiry_date
+      )
+    on conflict do nothing;
+  end if;
+end $$;
 
 alter table public.attendance
   add column if not exists user_id uuid references public.users(id) on delete cascade,
@@ -88,14 +96,22 @@ alter table public.attendance
   alter column member_id drop not null,
   alter column status set default 'present';
 
-update public.attendance a
-set
-  user_id = coalesce(a.user_id, m.user_id),
-  gym_id = coalesce(a.gym_id, u.gym_id)
-from public.members m
-join public.users u on u.id = m.user_id
-where a.member_id = m.id
-  and (a.user_id is null or a.gym_id is null);
+-- Backfill attendance user_id/gym_id from members (safe for fresh/preview databases)
+do $$
+begin
+  if exists (
+    select from pg_tables where schemaname = 'public' and tablename = 'members'
+  ) then
+    update public.attendance a
+    set
+      user_id = coalesce(a.user_id, m.user_id),
+      gym_id = coalesce(a.gym_id, u.gym_id)
+    from public.members m
+    join public.users u on u.id = m.user_id
+    where a.member_id = m.id
+      and (a.user_id is null or a.gym_id is null);
+  end if;
+end $$;
 
 create index if not exists idx_attendance_user_id on public.attendance(user_id);
 create index if not exists idx_attendance_gym_date on public.attendance(gym_id, date);
