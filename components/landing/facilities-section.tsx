@@ -7,7 +7,6 @@ import {
   Dumbbell,
   Bike,
   PersonStanding,
-  Droplets,
   Shirt,
   ShieldCheck,
   Wifi,
@@ -29,11 +28,6 @@ const facilities = [
     icon: PersonStanding,
     title: "Functional Area",
     description: "CrossFit, TRX, kettlebells, and battle ropes",
-  },
-  {
-    icon: Droplets,
-    title: "Steam Room",
-    description: "Relax and recover after intense workouts",
   },
   {
     icon: Shirt,
