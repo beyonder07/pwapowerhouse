@@ -102,8 +102,6 @@ export class AuthModuleService {
     })
 
     if (error) throw error
-    console.log(`[AUTH] Password Change OTP for ${email}: ${otpCode}`)
-    
     return { success: true }
   }
 
