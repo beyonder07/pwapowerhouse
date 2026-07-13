@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Check, Zap, ShieldCheck, Crosshair, Sparkles, PhoneCall } from "lucide-react"
 
 const features = [
-  "Full gym access — 6 days a week",
-  "1-on-1 personal trainer sessions",
+  "Full gym access 6 days a week",
+  "1-on-1 personal trainer sessions (limited)",
   "Custom workout plan (updated monthly)",
   "Certified nutrition & diet guidance",
   "Personalised meal chart",
@@ -55,7 +55,7 @@ export function PlansSection() {
             Train with an expert,<br className="hidden sm:block" /> not just a plan
           </h2>
           <p className="mt-6 text-base md:text-lg text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Personalised training and certified nutrition — everything you need, nothing you don&apos;t.
+            Personalised training and certified nutrition everything you need, nothing you don&apos;t.
           </p>
         </motion.div>
 
@@ -163,14 +163,6 @@ export function PlansSection() {
               className="absolute -bottom-16 -left-16 w-52 h-52 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle, rgba(220,38,38,0.05) 0%, transparent 70%)" }}
             />
-
-            {/* Badge */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-              <span className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#1a1a1a] text-white text-xs font-bold tracking-wide rounded-full whitespace-nowrap border border-white/15 shadow-lg">
-                <Sparkles className="h-3 w-3 text-amber-400" />
-                Elite Coaching
-              </span>
-            </div>
 
             {/* Icon container */}
             <motion.div
