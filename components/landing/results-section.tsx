@@ -44,7 +44,7 @@ export function ResultsSection() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
 
   return (
-    <section className="py-20 lg:py-32 bg-ph-navy-light/80 backdrop-blur-[2px]">
+    <section className="py-20 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           ref={ref}
@@ -75,7 +75,7 @@ export function ResultsSection() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.4, delay: 0.1 + index * 0.07 }}
               whileHover={{ scale: 1.05, y: -2 }}
-              className="text-center p-4 md:p-8 rounded-lg md:rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-accent/30 transition-colors"
+              className="text-center p-4 md:p-8 rounded-lg md:rounded-2xl bg-transparent border border-white/10 hover:border-accent/30 transition-colors"
             >
               <motion.p 
                 className="text-2xl md:text-5xl font-bold text-accent"
@@ -99,7 +99,7 @@ export function ResultsSection() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: 0.2 + index * 0.1, ease: "easeOut" }}
               whileHover={{ scale: 1.01, y: -3 }}
-              className="rounded-lg md:rounded-2xl border border-slate-800 bg-slate-900/50 p-5 md:p-8 space-y-3 md:space-y-4 hover:border-accent/30 transition-colors"
+              className="rounded-lg md:rounded-2xl border border-white/10 bg-transparent p-5 md:p-8 space-y-3 md:space-y-4 hover:border-accent/30 transition-colors"
             >
               <div 
                 className="flex items-center gap-0.5"

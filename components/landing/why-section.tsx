@@ -68,7 +68,7 @@ export function WhySection() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
 
   return (
-    <section id="why" className="py-16 md:py-20 lg:py-32 bg-background/75 backdrop-blur-[2px]">
+    <section id="why" className="py-16 md:py-20 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           ref={ref}
@@ -96,7 +96,7 @@ export function WhySection() {
               key={feature.title}
               variants={itemVariants}
               whileHover={{ y: -4, scale: 1.01 }}
-              className="group space-y-3 p-4 md:p-6 rounded-lg md:rounded-2xl bg-slate-900/50 border border-slate-800 hover:border-accent/30 transition-all duration-300 overflow-hidden"
+              className="group space-y-3 p-4 md:p-6 rounded-lg md:rounded-2xl bg-transparent border border-white/10 hover:border-accent/40 transition-all duration-300 overflow-hidden"
             >
               <div 
                 className="flex items-center gap-3"

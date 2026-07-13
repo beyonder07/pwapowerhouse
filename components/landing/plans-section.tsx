@@ -61,7 +61,7 @@ export function PlansSection() {
   const isInView = useInView(ref, { once: true, margin: "-100px" })
 
   return (
-    <section id="plans" className="py-20 lg:py-32 bg-ph-navy-light/80 backdrop-blur-[2px]">
+    <section id="plans" className="py-20 lg:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <motion.div
           ref={ref}
@@ -88,8 +88,8 @@ export function PlansSection() {
               whileHover={plan.popular ? { y: -8, scale: 1.01 } : { y: -4, scale: 1.01 }}
               className={`relative rounded-xl md:rounded-2xl border p-5 md:p-8 transition-all duration-300 ${
                 plan.popular
-                  ? "border-accent bg-slate-900/80 ring-2 ring-accent/20 scale-100 md:scale-105 lg:scale-110 shadow-lg"
-                  : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
+                  ? "border-accent ring-2 ring-accent/20 scale-100 md:scale-105 lg:scale-110 shadow-lg bg-transparent"
+                  : "border-white/10 bg-transparent hover:border-white/20"
               }`}
             >
               {plan.popular && (

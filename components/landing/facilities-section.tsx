@@ -2,6 +2,7 @@
 
 import { motion, useInView } from "framer-motion"
 import { useRef } from "react"
+import Image from "next/image"
 import {
   Dumbbell,
   Bike,
@@ -57,10 +58,10 @@ const facilities = [
 ]
 
 const galleryImages = [
-  { title: "Weight Room", placeholder: true },
-  { title: "Cardio Area", placeholder: true },
-  { title: "Training Zone", placeholder: true },
-  { title: "Reception", placeholder: true },
+  { title: "Training Floor", src: "/training-area.png", alt: "PowerHouse Gym training floor with machines and free weights" },
+  { title: "Weight Stack", src: "/weight-stack.jpg", alt: "PowerHouse Gym dumbbell rack with full weight selection" },
+  { title: "Cardio Area", src: "/cardio-area.png", alt: "PowerHouse Gym cardio zone with treadmills and battle ropes" },
+  { title: "Reception", src: "/reception.jpeg", alt: "PowerHouse Gym reception desk" },
 ]
 
 export function FacilitiesSection() {
@@ -92,31 +93,27 @@ export function FacilitiesSection() {
           transition={{ duration: 0.6 }}
           className="mb-20"
         >
-          <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid gap-4 md:gap-6 grid-cols-2">
             {galleryImages.map((image, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, scale: 0.85, y: 20 }}
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={isInView ? { opacity: 1, scale: 1, y: 0 } : {}}
-                transition={{ duration: 0.5, delay: index * 0.08, ease: "easeOut" }}
-                whileHover={{ scale: 1.03 }}
-                className="relative aspect-square rounded-xl md:rounded-2xl overflow-hidden bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 group cursor-pointer shadow-md hover:shadow-lg transition-shadow"
+                transition={{ duration: 0.55, delay: index * 0.12, ease: "easeOut" }}
+                whileHover={{ scale: 1.02 }}
+                className="relative aspect-video rounded-xl md:rounded-2xl overflow-hidden border border-slate-700 group cursor-pointer shadow-md hover:shadow-xl transition-shadow"
               >
-                <motion.div 
-                  className="absolute inset-0 flex flex-col items-center justify-center space-y-2 md:space-y-3 bg-black/10 group-hover:bg-black/20 md:group-hover:bg-black/30 transition-all duration-300"
-                  whileHover={{ scale: 1.05 }}
-                >
-                  <motion.div 
-                    className="w-12 h-12 md:w-16 md:h-16 rounded-lg bg-slate-700/50 group-hover:bg-accent/20 transition-colors flex items-center justify-center"
-                    whileHover={{ scale: 1.08, rotate: 4 }}
-                    transition={{ type: "spring", stiffness: 300 }}
-                  >
-                    <Dumbbell className="h-6 md:h-8 w-6 md:w-8 text-slate-400 group-hover:text-accent transition-colors" />
-                  </motion.div>
-                  <p className="text-slate-300 font-semibold text-xs md:text-sm text-center px-2">
-                    {image.title}
-                  </p>
-                </motion.div>
+                <Image
+                  src={image.src}
+                  alt={image.alt}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                <p className="absolute bottom-3 left-4 text-white font-semibold text-sm md:text-base drop-shadow">
+                  {image.title}
+                </p>
               </motion.div>
             ))}
           </div>
@@ -139,7 +136,7 @@ export function FacilitiesSection() {
                 animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.4, delay: index * 0.07, ease: "easeOut" }}
                 whileHover={{ y: -4, scale: 1.01 }}
-                className="space-y-3 p-4 md:p-5 rounded-lg md:rounded-xl bg-slate-900/50 border border-slate-800 hover:border-accent/30 transition-all duration-300"
+                className="space-y-3 p-4 md:p-5 rounded-lg md:rounded-xl bg-transparent border border-white/10 hover:border-accent/30 transition-all duration-300"
               >
                 <motion.div 
                   className="flex items-center gap-3"

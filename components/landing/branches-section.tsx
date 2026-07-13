@@ -84,7 +84,7 @@ export function BranchesSection() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: index * 0.15, ease: "easeOut" }}
               whileHover={{ scale: 1.01, y: -4 }}
-              className="group relative rounded-lg md:rounded-2xl border border-slate-800 bg-slate-900/50 overflow-hidden hover:border-accent/30 transition-all shadow-md hover:shadow-lg"
+              className="group relative rounded-lg md:rounded-2xl border border-white/10 bg-transparent overflow-hidden hover:border-accent/30 transition-all shadow-md hover:shadow-lg"
             >
               {/* Image placeholder */}
               <motion.div 
