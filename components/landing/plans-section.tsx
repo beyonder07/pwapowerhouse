@@ -4,7 +4,7 @@ import { motion, useInView } from "framer-motion"
 import { useRef } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Check, Zap, ShieldCheck, Target, Sparkles, PhoneCall } from "lucide-react"
+import { Check, Zap, ShieldCheck, Crosshair, Sparkles, PhoneCall } from "lucide-react"
 
 const features = [
   "Full gym access — 6 days a week",
@@ -139,7 +139,7 @@ export function PlansSection() {
               </div>
 
               <div className="mt-2 mb-5">
-                <Target className="h-8 w-8 text-accent mb-3" />
+                <Crosshair className="h-8 w-8 text-accent mb-3" />
                 <h3 className="text-xl md:text-2xl font-bold text-foreground mb-1">Advanced Personal Training</h3>
                 <p className="text-slate-400 text-xs">Charges customised to your goal &amp; timeline</p>
               </div>
